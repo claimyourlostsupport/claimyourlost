@@ -1,4 +1,5 @@
-# Render Blueprint: deploy the API from the server/ folder.
+# Render Blueprint: API lives in server/; build/start use npm --prefix server (do not use
+# root `yarn` — there is no lockfile at repo root and root has no API start script).
 # Dashboard: New → Blueprint → connect this repo → Render will prompt for secret env vars.
 # Docs: https://render.com/docs/blueprint-spec
 
@@ -8,9 +9,9 @@ services:
     runtime: node
     plan: free
     region: oregon
-    rootDir: server
-    buildCommand: npm install
-    startCommand: npm start
+    # Install and run API from monorepo root (avoids Render ignoring rootDir / wrong cwd)
+    buildCommand: npm install --prefix server
+    startCommand: npm start --prefix server
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
