@@ -1,0 +1,23 @@
+# Render Blueprint: deploy the API from the server/ folder.
+# Dashboard: New → Blueprint → connect this repo → Render will prompt for secret env vars.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: claimyourlost-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
