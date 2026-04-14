@@ -19,6 +19,7 @@ export const MAIN_CATEGORIES = [
       { id: 'earbuds_headphones', label: 'Earbuds / headphones' },
       { id: 'chargers_accessories', label: 'Chargers / accessories' },
       { id: 'cameras', label: 'Cameras' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -34,6 +35,7 @@ export const MAIN_CATEGORIES = [
       { id: 'backpack', label: 'Backpack' },
       { id: 'laptop_bag', label: 'Laptop bag' },
       { id: 'travel_bag', label: 'Travel bag' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -53,6 +55,7 @@ export const MAIN_CATEGORIES = [
       { id: 'office_id_card', label: 'Office ID card' },
       { id: 'certificates', label: 'Certificates' },
       { id: 'tickets', label: 'Tickets (flight/train)' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -67,6 +70,7 @@ export const MAIN_CATEGORIES = [
       { id: 'car_keys', label: 'Car keys' },
       { id: 'locker_keys', label: 'Locker keys' },
       { id: 'keychains', label: 'Keychains' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -82,6 +86,7 @@ export const MAIN_CATEGORIES = [
       { id: 'bracelets', label: 'Bracelets' },
       { id: 'watches', label: 'Watches' },
       { id: 'gold_silver', label: 'Gold / silver items' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -96,6 +101,7 @@ export const MAIN_CATEGORIES = [
       { id: 'shoes', label: 'Shoes' },
       { id: 'helmets', label: 'Helmets' },
       { id: 'glasses_sunglasses', label: 'Glasses / sunglasses' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -108,7 +114,7 @@ export const MAIN_CATEGORIES = [
     subs: [
       { id: 'dogs', label: 'Dogs' },
       { id: 'cats', label: 'Cats' },
-      { id: 'other_pets', label: 'Other pets' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -123,6 +129,7 @@ export const MAIN_CATEGORIES = [
       { id: 'scooters', label: 'Scooters' },
       { id: 'car_parts', label: 'Car parts' },
       { id: 'vehicle_documents', label: 'Vehicle documents' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -137,6 +144,7 @@ export const MAIN_CATEGORIES = [
       { id: 'notebooks', label: 'Notebooks' },
       { id: 'id_cards', label: 'ID cards' },
       { id: 'office_equipment', label: 'Office equipment' },
+      { id: 'other', label: 'Other' },
     ],
   },
   {
@@ -150,6 +158,7 @@ export const MAIN_CATEGORIES = [
       { id: 'toys', label: 'Toys' },
       { id: 'gifts', label: 'Gifts' },
       { id: 'unknown_items', label: 'Unknown items' },
+      { id: 'other', label: 'Other' },
     ],
   },
 ];
