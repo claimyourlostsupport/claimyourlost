@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
-import { listingImgClass } from '../constants/images.js';
+import { listingImgClass, listingImageThumbBoxClass } from '../constants/images.js';
 import { formatCityCountryOrPlaceholder } from '../utils/place.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -50,6 +50,22 @@ export function Dashboard() {
     }
   }, [location.state, loading]);
 
+  useEffect(() => {
+    async function refreshNotifications() {
+      try {
+        const { data } = await api.get('/notifications');
+        setNotifications(data);
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener('cyl-notifications-refresh', refreshNotifications);
+    return () => window.removeEventListener('cyl-notifications-refresh', refreshNotifications);
+  }, []);
+
+  /** Chat alerts are removed from the panel once read; match alerts stay visible (read or unread). */
+  const visibleNotifications = notifications.filter((n) => n.type !== 'message' || !n.read);
+
   async function markRead(id) {
     try {
       await api.patch(`/notifications/${id}/read`);
@@ -96,13 +112,13 @@ export function Dashboard() {
                 </button>
               )}
             </div>
-            {notifications.length === 0 ? (
+            {visibleNotifications.length === 0 ? (
               <p className="text-slate-500 text-sm py-8 bg-white rounded-2xl border border-dashed border-slate-200 text-center">
-                No alerts yet. When someone posts a possible match for your listing, you will see it here.
+                No alerts yet. Possible matches for your listings and new chat messages appear here.
               </p>
             ) : (
               <ul className="space-y-2">
-                {notifications.map((n) => (
+                {visibleNotifications.map((n) => (
                   <li
                     key={n._id}
                     className={`rounded-2xl border p-4 ${
@@ -112,7 +128,16 @@ export function Dashboard() {
                     <p className="font-semibold text-slate-900 text-sm">{n.title}</p>
                     <p className="text-sm text-slate-600 mt-1">{n.body}</p>
                     <div className="flex flex-wrap gap-3 mt-3">
-                      {n.relatedItemId && (
+                      {n.type === 'message' && n.relatedItemId && (
+                        <Link
+                          to={`/items/${String(n.relatedItemId)}/chat`}
+                          onClick={() => markRead(n._id)}
+                          className="text-sm font-semibold text-brand-blue hover:underline"
+                        >
+                          Open chat
+                        </Link>
+                      )}
+                      {n.relatedItemId && n.type !== 'message' && (
                         <Link
                           to={`/items/${String(n.relatedItemId)}`}
                           onClick={() => !n.read && markRead(n._id)}
@@ -121,7 +146,7 @@ export function Dashboard() {
                           Open listing
                         </Link>
                       )}
-                      {n.matchedItemId && String(n.matchedItemId) !== String(n.relatedItemId) && (
+                      {n.type === 'match' && n.matchedItemId && String(n.matchedItemId) !== String(n.relatedItemId) && (
                         <Link
                           to={`/items/${String(n.matchedItemId)}`}
                           onClick={() => !n.read && markRead(n._id)}
@@ -153,11 +178,11 @@ export function Dashboard() {
                     key={item._id}
                     className="flex gap-4 bg-white rounded-2xl border border-slate-100 p-3 shadow-sm"
                   >
-                    <div className="flex h-[200px] w-[200px] items-center justify-center rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                    <div className={listingImageThumbBoxClass}>
                       {item.image ? (
                         <img src={assetUrl(item.image)} alt="" className={listingImgClass} />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-3xl">📦</div>
+                        <div className="flex h-full w-full items-center justify-center text-lg">📦</div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -203,11 +228,11 @@ export function Dashboard() {
                       key={claim._id}
                       className="flex gap-4 bg-white rounded-2xl border border-slate-100 p-3 shadow-sm"
                     >
-                      <div className="flex h-[200px] w-[200px] items-center justify-center rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                      <div className={listingImageThumbBoxClass}>
                         {it.image ? (
                           <img src={assetUrl(it.image)} alt="" className={listingImgClass} />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-3xl">📦</div>
+                          <div className="flex h-full w-full items-center justify-center text-lg">📦</div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">

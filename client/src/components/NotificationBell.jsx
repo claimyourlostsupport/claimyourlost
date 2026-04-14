@@ -22,10 +22,15 @@ export function NotificationBell() {
       }
     }
     load();
-    const t = setInterval(load, 45000);
+    const t = setInterval(load, 15000);
+    function onRefresh() {
+      load();
+    }
+    window.addEventListener('cyl-notifications-refresh', onRefresh);
     return () => {
       cancelled = true;
       clearInterval(t);
+      window.removeEventListener('cyl-notifications-refresh', onRefresh);
     };
   }, [isAuthenticated]);
 

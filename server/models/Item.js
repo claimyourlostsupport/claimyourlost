@@ -16,6 +16,8 @@ const itemSchema = new mongoose.Schema(
     contactUrgency: { type: String, default: '', trim: true },
     image: { type: String, default: '' },
     location: { type: String, default: '', trim: true },
+    city: { type: String, default: '', trim: true },
+    county: { type: String, default: '', trim: true },
     country: { type: String, default: '', trim: true },
     lat: { type: Number, default: null },
     lng: { type: Number, default: null },

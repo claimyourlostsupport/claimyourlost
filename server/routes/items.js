@@ -19,6 +19,75 @@ function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Text / location clauses: q, city, county (ANDed when multiple). */
+function buildTextLocationClauses(query) {
+  const q = query.q ? String(query.q).trim() : '';
+  const cityQ = query.city ? String(query.city).trim() : '';
+  const countyQ = query.county ? String(query.county).trim() : '';
+  const parts = [];
+  if (q) {
+    const safe = escapeRegex(q);
+    parts.push({
+      $or: [
+        { title: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } },
+        { location: { $regex: safe, $options: 'i' } },
+        { country: { $regex: safe, $options: 'i' } },
+        { city: { $regex: safe, $options: 'i' } },
+        { county: { $regex: safe, $options: 'i' } },
+        { subcategoryCustom: { $regex: safe, $options: 'i' } },
+      ],
+    });
+  }
+  if (cityQ && cityQ !== 'all') {
+    const safe = escapeRegex(cityQ);
+    parts.push({
+      $or: [
+        { city: { $regex: new RegExp(`^${safe}$`, 'i') } },
+        { location: { $regex: safe, $options: 'i' } },
+      ],
+    });
+  }
+  if (countyQ && countyQ !== 'all') {
+    const safe = escapeRegex(countyQ);
+    parts.push({
+      $or: [
+        { county: { $regex: new RegExp(`^${safe}$`, 'i') } },
+        { location: { $regex: safe, $options: 'i' } },
+      ],
+    });
+  }
+  return parts;
+}
+
+function buildItemListFilter(query) {
+  const filter = {};
+  const type = query.type;
+  if (type && ['lost', 'found'].includes(type)) {
+    filter.type = type;
+  }
+  const category = query.category ? String(query.category).toLowerCase() : '';
+  const catFilter = categoryMongoFilter(category);
+  if (catFilter) {
+    filter.category = catFilter;
+  }
+  const subQ = query.subcategory ? String(query.subcategory).trim().toLowerCase() : '';
+  if (subQ && subQ !== 'all' && catFilter) {
+    filter.subcategory = subQ;
+  }
+  const countryQ = query.country ? String(query.country).trim() : '';
+  if (countryQ && countryQ !== 'all') {
+    filter.country = { $regex: new RegExp(`^${escapeRegex(countryQ)}$`, 'i') };
+  }
+  const parts = buildTextLocationClauses(query);
+  if (parts.length === 1) {
+    Object.assign(filter, parts[0]);
+  } else if (parts.length > 1) {
+    filter.$and = parts;
+  }
+  return filter;
+}
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = (d) => (d * Math.PI) / 180;
@@ -76,6 +145,8 @@ router.post('/', requireAuth, (req, res, next) => {
       petBreed,
       contactUrgency,
       location,
+      city,
+      county,
       country,
       date,
       lat,
@@ -100,7 +171,9 @@ router.post('/', requireAuth, (req, res, next) => {
         } catch {
           /* ignore */
         }
-        return res.status(400).json({ error: 'Could not process image. Try another photo.' });
+        const hint =
+          'Could not process image. Try a smaller JPEG or PNG. iPhone HEIC sometimes fails on Windows — in Photos use Share → save as JPEG, or take a screenshot.';
+        return res.status(400).json({ error: hint });
       }
     }
 
@@ -129,6 +202,8 @@ router.post('/', requireAuth, (req, res, next) => {
       petBreed: String(petBreed || '').trim(),
       contactUrgency: String(contactUrgency || '').trim(),
       location: String(location || '').trim(),
+      city: String(city || '').trim(),
+      county: String(county || '').trim(),
       country: String(country || '').trim(),
       lat: coords.lat,
       lng: coords.lng,
@@ -169,32 +244,27 @@ router.get('/near', async (req, res) => {
     const lat = parseCoord(req.query.lat);
     const lng = parseCoord(req.query.lng);
     const km = Math.min(100, Math.max(1, parseFloat(req.query.km) || 25));
-    const type = req.query.type;
-    const category = req.query.category ? String(req.query.category).toLowerCase() : '';
 
     if (lat == null || lng == null) {
       return res.status(400).json({ error: 'lat and lng query params required' });
     }
 
+    const from = req.query.from ? new Date(String(req.query.from)) : null;
+    const to = req.query.to ? new Date(String(req.query.to)) : null;
+
     const geoFilter = {
+      ...buildItemListFilter(req.query),
       lat: { $ne: null },
       lng: { $ne: null },
       status: 'open',
     };
-    if (type && ['lost', 'found'].includes(type)) {
-      geoFilter.type = type;
+    if (from && !Number.isNaN(from.getTime())) {
+      geoFilter.date = { ...(geoFilter.date || {}), $gte: from };
     }
-    const catFilter = categoryMongoFilter(category);
-    if (catFilter) {
-      geoFilter.category = catFilter;
-    }
-    const subQ = req.query.subcategory ? String(req.query.subcategory).trim().toLowerCase() : '';
-    if (subQ && subQ !== 'all' && catFilter) {
-      geoFilter.subcategory = subQ;
-    }
-    const nearCountry = req.query.country ? String(req.query.country).trim() : '';
-    if (nearCountry && nearCountry !== 'all') {
-      geoFilter.country = { $regex: new RegExp(`^${escapeRegex(nearCountry)}$`, 'i') };
+    if (to && !Number.isNaN(to.getTime())) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      geoFilter.date = { ...(geoFilter.date || {}), $lte: end };
     }
 
     const all = await Item.find(geoFilter)
@@ -249,6 +319,52 @@ router.get('/countries', async (_req, res) => {
   }
 });
 
+router.get('/cities', async (req, res) => {
+  try {
+    const countryQ = req.query.country ? String(req.query.country).trim() : '';
+    const mongo = {
+      city: { $exists: true, $nin: [null, ''] },
+    };
+    if (countryQ && countryQ !== 'all') {
+      mongo.country = { $regex: new RegExp(`^${escapeRegex(countryQ)}$`, 'i') };
+    }
+    const docs = await Item.find(mongo).select('city').lean();
+    const set = new Set();
+    for (const d of docs) {
+      const c = String(d.city || '').trim();
+      if (c) set.add(c);
+    }
+    const list = [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    res.json(list);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load cities' });
+  }
+});
+
+router.get('/counties', async (req, res) => {
+  try {
+    const countryQ = req.query.country ? String(req.query.country).trim() : '';
+    const mongo = {
+      county: { $exists: true, $nin: [null, ''] },
+    };
+    if (countryQ && countryQ !== 'all') {
+      mongo.country = { $regex: new RegExp(`^${escapeRegex(countryQ)}$`, 'i') };
+    }
+    const docs = await Item.find(mongo).select('county').lean();
+    const set = new Set();
+    for (const d of docs) {
+      const c = String(d.county || '').trim();
+      if (c) set.add(c);
+    }
+    const list = [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    res.json(list);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load counties' });
+  }
+});
+
 router.get('/reverse-geocode', async (req, res) => {
   try {
     const lat = parseCoord(req.query.lat);
@@ -277,13 +393,19 @@ router.get('/reverse-geocode', async (req, res) => {
       addr.town ||
       addr.village ||
       addr.municipality ||
-      addr.county ||
       addr.state_district ||
       addr.state ||
+      '';
+    const county =
+      addr.county ||
+      addr.state_district ||
+      addr.region ||
+      addr.macroregion ||
       '';
     res.json({
       country: country ? String(country) : '',
       city: city ? String(city) : '',
+      county: county ? String(county) : '',
       displayName: data.display_name ? String(data.display_name) : '',
     });
   } catch (err) {
@@ -294,29 +416,11 @@ router.get('/reverse-geocode', async (req, res) => {
 
 router.get('/search', async (req, res) => {
   try {
-    const q = req.query.q ? String(req.query.q).trim() : '';
-    const type = req.query.type;
-    const category = req.query.category;
-    const subcategoryQ = req.query.subcategory ? String(req.query.subcategory).trim().toLowerCase() : '';
-    const countryQ = req.query.country ? String(req.query.country).trim() : '';
     const limit = Math.min(500, Math.max(1, parseInt(String(req.query.limit || '200'), 10) || 200));
     const from = req.query.from ? new Date(String(req.query.from)) : null;
     const to = req.query.to ? new Date(String(req.query.to)) : null;
 
-    const filter = {};
-    if (type && ['lost', 'found'].includes(type)) {
-      filter.type = type;
-    }
-    const catFilter = categoryMongoFilter(category);
-    if (catFilter) {
-      filter.category = catFilter;
-    }
-    if (subcategoryQ && subcategoryQ !== 'all' && catFilter) {
-      filter.subcategory = subcategoryQ;
-    }
-    if (countryQ && countryQ !== 'all') {
-      filter.country = { $regex: new RegExp(`^${escapeRegex(countryQ)}$`, 'i') };
-    }
+    const filter = buildItemListFilter(req.query);
     if (from && !Number.isNaN(from.getTime())) {
       filter.date = { ...(filter.date || {}), $gte: from };
     }
@@ -324,16 +428,6 @@ router.get('/search', async (req, res) => {
       const end = new Date(to);
       end.setHours(23, 59, 59, 999);
       filter.date = { ...(filter.date || {}), $lte: end };
-    }
-    if (q) {
-      const safe = escapeRegex(q);
-      filter.$or = [
-        { title: { $regex: safe, $options: 'i' } },
-        { description: { $regex: safe, $options: 'i' } },
-        { location: { $regex: safe, $options: 'i' } },
-        { country: { $regex: safe, $options: 'i' } },
-        { subcategoryCustom: { $regex: safe, $options: 'i' } },
-      ];
     }
 
     const items = await Item.find(filter)
@@ -350,37 +444,9 @@ router.get('/search', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const type = req.query.type;
-    const category = req.query.category;
-    const subcategoryQ = req.query.subcategory ? String(req.query.subcategory).trim().toLowerCase() : '';
-    const countryQ = req.query.country ? String(req.query.country).trim() : '';
-    const q = req.query.q ? String(req.query.q).trim() : '';
     const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit || '100'), 10) || 100));
 
-    const filter = {};
-    if (type && ['lost', 'found'].includes(type)) {
-      filter.type = type;
-    }
-    const catFilter = categoryMongoFilter(category);
-    if (catFilter) {
-      filter.category = catFilter;
-    }
-    if (subcategoryQ && subcategoryQ !== 'all' && catFilter) {
-      filter.subcategory = subcategoryQ;
-    }
-    if (countryQ && countryQ !== 'all') {
-      filter.country = { $regex: new RegExp(`^${escapeRegex(countryQ)}$`, 'i') };
-    }
-    if (q) {
-      const safe = escapeRegex(q);
-      filter.$or = [
-        { title: { $regex: safe, $options: 'i' } },
-        { description: { $regex: safe, $options: 'i' } },
-        { location: { $regex: safe, $options: 'i' } },
-        { country: { $regex: safe, $options: 'i' } },
-        { subcategoryCustom: { $regex: safe, $options: 'i' } },
-      ];
-    }
+    const filter = buildItemListFilter(req.query);
 
     const items = await Item.find(filter)
       .sort({ createdAt: -1 })

@@ -3,7 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ShareListing } from '../components/ShareListing.jsx';
-import { listingImgClass } from '../constants/images.js';
+import {
+  listingImgClass,
+  listingImageFrameClass,
+  listingImagePlaceholderClass,
+} from '../constants/images.js';
 import { formatItemCategory } from '../constants/categories.js';
 
 function formatDetailDate(d) {
@@ -124,11 +128,11 @@ export function ItemDetail() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex min-h-[200px] items-center justify-center bg-slate-100 py-4">
+        <div className={`${listingImageFrameClass} py-4`}>
           {item.image ? (
             <img src={assetUrl(item.image)} alt="" className={listingImgClass} />
           ) : (
-            <div className="flex h-[200px] w-[200px] items-center justify-center text-5xl opacity-30">📦</div>
+            <div className={listingImagePlaceholderClass}>📦</div>
           )}
         </div>
         <div className="p-5 sm:p-6 space-y-4">
@@ -148,12 +152,18 @@ export function ItemDetail() {
           <div className="flex flex-col gap-2 text-slate-600 text-sm">
             <p>
               <span className="font-medium text-slate-800">📍</span>{' '}
-              {item.location?.trim() ? (
-                <span>{item.location.trim()}</span>
+              {item.city?.trim() || item.location?.trim() ? (
+                <span>{[item.city?.trim(), item.location?.trim()].filter(Boolean).join(' · ')}</span>
               ) : (
-                <span className="text-slate-400">City not set</span>
+                <span className="text-slate-400">City / area not set</span>
               )}
             </p>
+            {item.county?.trim() && (
+              <p>
+                <span className="font-medium text-slate-800">🏛</span>{' '}
+                <span>{item.county.trim()}</span>
+              </p>
+            )}
             <p>
               <span className="font-medium text-slate-800">🌍</span>{' '}
               {item.country != null && String(item.country).trim() ? (

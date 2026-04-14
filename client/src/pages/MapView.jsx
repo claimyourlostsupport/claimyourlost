@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import { api, assetUrl } from '../api/client';
+import { listingImgClass } from '../constants/images.js';
 import { formatCityCountryOrPlaceholder } from '../utils/place.js';
 import 'leaflet/dist/leaflet.css';
 
@@ -187,7 +188,7 @@ export function MapView() {
                         <img
                           src={assetUrl(item.image)}
                           alt=""
-                          className="mb-2 h-[200px] w-[200px] max-w-full rounded-lg object-cover"
+                          className={`mb-2 ${listingImgClass}`}
                         />
                       )}
                       <p className="font-semibold text-slate-900 text-sm">{item.title}</p>

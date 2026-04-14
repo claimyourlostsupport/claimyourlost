@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
+import { listingImgClass } from '../constants/images.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const POLL_MS = 4000;
@@ -59,6 +60,22 @@ export function Chat() {
   }, [id, isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated || !id) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.post(`/notifications/read-for-item/${id}`);
+        if (!cancelled) window.dispatchEvent(new CustomEvent('cyl-notifications-refresh'));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, id]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -71,6 +88,7 @@ export function Chat() {
       await api.post('/messages', { itemId: id, text: t });
       setText('');
       await loadMessages();
+      window.dispatchEvent(new CustomEvent('cyl-notifications-refresh'));
     } catch (err) {
       setError(err.response?.data?.error || 'Send failed');
     } finally {
@@ -93,7 +111,7 @@ export function Chat() {
 
       {item?.image && (
         <div className="flex gap-3 mb-4 p-3 bg-white rounded-xl border border-slate-100">
-          <img src={assetUrl(item.image)} alt="" className="h-[200px] w-[200px] max-w-full rounded-lg object-cover shrink-0" />
+          <img src={assetUrl(item.image)} alt="" className={listingImgClass} />
           <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2 self-center">
             Safety: do not share passwords, OTPs, or full ID numbers. Meet in safe public places when handing over
             items.

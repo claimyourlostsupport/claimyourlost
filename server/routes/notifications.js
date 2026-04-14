@@ -52,4 +52,23 @@ router.post('/read-all', requireAuth, async (req, res) => {
   }
 });
 
+/** Mark chat notifications for an item read when the user opens that chat. */
+router.post('/read-for-item/:itemId', requireAuth, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      {
+        userId: req.userId,
+        relatedItemId: req.params.itemId,
+        type: 'message',
+        read: false,
+      },
+      { read: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
 export default router;

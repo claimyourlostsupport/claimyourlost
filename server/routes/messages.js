@@ -2,7 +2,41 @@ import { Router } from 'express';
 import { Message } from '../models/Message.js';
 import { Item } from '../models/Item.js';
 import { Claim } from '../models/Claim.js';
+import { Notification } from '../models/Notification.js';
 import { requireAuth } from '../middleware/auth.js';
+
+async function notifyMessageRecipients(item, senderId, textPreview) {
+  const ownerId = item.userId;
+  const oid = ownerId.toString();
+  const sid = senderId.toString();
+
+  const title = 'New message';
+  const snippet = String(textPreview || '').trim().slice(0, 140);
+  const itemTitle = String(item.title || 'Listing').slice(0, 60);
+  const body = `About “${itemTitle}”: ${snippet || '—'}`;
+
+  const push = (userId) =>
+    Notification.create({
+      userId,
+      type: 'message',
+      title,
+      body,
+      relatedItemId: item._id,
+      read: false,
+    });
+
+  if (sid !== oid) {
+    await push(ownerId);
+    return;
+  }
+
+  const others = await Message.distinct('senderId', {
+    itemId: item._id,
+    senderId: { $ne: ownerId },
+  });
+
+  await Promise.all(others.map((uid) => push(uid)));
+}
 
 const router = Router();
 
@@ -38,6 +72,12 @@ router.post('/', requireAuth, async (req, res) => {
       senderId: req.userId,
       text: String(text).trim().slice(0, 5000),
     });
+
+    try {
+      await notifyMessageRecipients(access.item, req.userId, msg.text);
+    } catch (e) {
+      console.error('message notification', e);
+    }
 
     const populated = await Message.findById(msg._id)
       .populate('senderId', 'phone')

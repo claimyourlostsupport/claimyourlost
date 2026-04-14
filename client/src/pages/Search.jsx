@@ -1,9 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { ItemCard } from '../components/ItemCard.jsx';
 import { MAIN_CATEGORIES, getMainCategory } from '../constants/categories.js';
 import { mergeCountryOptions } from '../constants/countries.js';
+
+function searchApiParams({
+  q,
+  type,
+  category,
+  subcategory,
+  country,
+  city,
+  county,
+  from,
+  to,
+}) {
+  const catParam = category === 'all' ? undefined : category;
+  const subParam = subcategory === 'all' ? undefined : subcategory;
+  return {
+    q: q?.trim() || undefined,
+    type: type || undefined,
+    category: catParam,
+    subcategory: subParam,
+    country: country === 'all' ? undefined : country,
+    city: city?.trim() || undefined,
+    county: county?.trim() || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
+}
 
 export function Search() {
   const [params, setParams] = useSearchParams();
@@ -14,6 +40,8 @@ export function Search() {
   const from = params.get('from') || '';
   const to = params.get('to') || '';
   const country = params.get('country') || 'all';
+  const city = params.get('city') || '';
+  const county = params.get('county') || '';
 
   const [localQ, setLocalQ] = useState(q);
   const [items, setItems] = useState([]);
@@ -23,8 +51,27 @@ export function Search() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [geo, setGeo] = useState(null);
   const [countryList, setCountryList] = useState([]);
+  const [cityList, setCityList] = useState([]);
+  const [countyList, setCountyList] = useState([]);
+  const [nearbyFallback, setNearbyFallback] = useState(false);
 
   const mainMeta = category !== 'all' ? getMainCategory(category) : null;
+
+  const baseParams = useMemo(
+    () =>
+      searchApiParams({
+        q,
+        type,
+        category,
+        subcategory,
+        country,
+        city,
+        county,
+        from,
+        to,
+      }),
+    [q, type, category, subcategory, country, city, county, from, to]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +91,40 @@ export function Search() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/items/cities', {
+          params: { country: country === 'all' ? undefined : country },
+        });
+        if (!cancelled && Array.isArray(data)) setCityList(data);
+      } catch {
+        if (!cancelled) setCityList([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [country]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/items/counties', {
+          params: { country: country === 'all' ? undefined : country },
+        });
+        if (!cancelled && Array.isArray(data)) setCountyList(data);
+      } catch {
+        if (!cancelled) setCountyList([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [country]);
+
+  useEffect(() => {
     setLocalQ(q);
   }, [q]);
 
@@ -52,35 +133,31 @@ export function Search() {
     (async () => {
       setLoading(true);
       setError('');
+      setNearbyFallback(false);
       try {
-        const catParam = category === 'all' ? undefined : category;
-        const subParam = subcategory === 'all' ? undefined : subcategory;
         if (nearbyMode && geo) {
-          const { data } = await api.get('/items/near', {
+          const { data: nearData } = await api.get('/items/near', {
             params: {
               lat: geo.lat,
               lng: geo.lng,
               km: 25,
-              type: type || undefined,
-              category: catParam,
-              subcategory: subParam,
-              country: country === 'all' ? undefined : country,
+              ...baseParams,
             },
           });
-          if (!cancelled) setItems(data);
+          let list = Array.isArray(nearData) ? nearData : [];
+          if (list.length === 0) {
+            const { data: searchData } = await api.get('/items/search', {
+              params: { ...baseParams, limit: 200 },
+            });
+            list = Array.isArray(searchData) ? searchData : [];
+            if (!cancelled) setNearbyFallback(true);
+          }
+          if (!cancelled) setItems(list);
         } else {
           const { data } = await api.get('/items/search', {
-            params: {
-              q: q || undefined,
-              type: type || undefined,
-              category: catParam,
-              subcategory: subParam,
-              country: country === 'all' ? undefined : country,
-              from: from || undefined,
-              to: to || undefined,
-            },
+            params: { ...baseParams, limit: 200 },
           });
-          if (!cancelled) setItems(data);
+          if (!cancelled) setItems(Array.isArray(data) ? data : []);
         }
       } catch (e) {
         if (!cancelled) {
@@ -94,7 +171,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [q, type, category, subcategory, country, from, to, nearbyMode, geo]);
+  }, [baseParams, nearbyMode, geo]);
 
   function updateParam(key, value) {
     const next = new URLSearchParams(params);
@@ -147,6 +224,7 @@ export function Search() {
   function clearNearby() {
     setNearbyMode(false);
     setGeo(null);
+    setNearbyFallback(false);
   }
 
   return (
@@ -161,13 +239,11 @@ export function Search() {
             value={localQ}
             onChange={(e) => setLocalQ(e.target.value)}
             placeholder="Keyword, city, country…"
-            disabled={nearbyMode}
-            className="flex-1 border-0 bg-transparent py-3 focus:ring-0 disabled:opacity-50"
+            className="flex-1 border-0 bg-transparent py-3 focus:ring-0"
           />
           <button
             type="submit"
-            disabled={nearbyMode}
-            className="px-5 py-3 rounded-xl bg-brand-blue text-white font-semibold text-sm disabled:opacity-50"
+            className="px-5 py-3 rounded-xl bg-brand-blue text-white font-semibold text-sm"
           >
             Go
           </button>
@@ -186,6 +262,12 @@ export function Search() {
           >
             {geoLoading ? 'Locating…' : nearbyMode ? '✓ Nearby (25 km) — tap to clear' : '📍 Near me (25 km)'}
           </button>
+          {nearbyMode && (
+            <span className="text-xs text-slate-600 max-w-xl">
+              Shows listings with a map pin within 25 km when available. If none have GPS, results match your other
+              filters (same as a normal search).
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -210,7 +292,7 @@ export function Search() {
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-start">
           <span className="text-sm text-slate-500 w-full py-1">Country</span>
           <select
             value={country}
@@ -224,6 +306,47 @@ export function Search() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="search-city" className="block text-xs font-medium text-slate-600 mb-1">
+              City
+            </label>
+            <input
+              id="search-city"
+              type="text"
+              list="search-city-options"
+              value={city}
+              onChange={(e) => updateParam('city', e.target.value.trim())}
+              placeholder="Filter by city (optional)"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+            />
+            <datalist id="search-city-options">
+              {cityList.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label htmlFor="search-county" className="block text-xs font-medium text-slate-600 mb-1">
+              County / district
+            </label>
+            <input
+              id="search-county"
+              type="text"
+              list="search-county-options"
+              value={county}
+              onChange={(e) => updateParam('county', e.target.value.trim())}
+              placeholder="Filter by county or district (optional)"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+            />
+            <datalist id="search-county-options">
+              {countyList.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -291,8 +414,7 @@ export function Search() {
               type="date"
               value={from}
               onChange={(e) => updateParam('from', e.target.value)}
-              disabled={nearbyMode}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
             />
           </div>
           <div>
@@ -304,8 +426,7 @@ export function Search() {
               type="date"
               value={to}
               onChange={(e) => updateParam('to', e.target.value)}
-              disabled={nearbyMode}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -313,6 +434,13 @@ export function Search() {
 
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{error}</p>
+      )}
+
+      {nearbyFallback && !error && (
+        <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+          No open listings with a map location within 25 km for these filters. Showing all listings that match your
+          filters (including posts without GPS).
+        </p>
       )}
 
       {loading ? (

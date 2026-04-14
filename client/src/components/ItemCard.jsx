@@ -1,22 +1,28 @@
 import { Link } from 'react-router-dom';
 import { assetUrl } from '../api/client';
-import { listingImgClass } from '../constants/images.js';
+import {
+  listingImgClass,
+  listingImageFrameClass,
+  listingImagePlaceholderClass,
+} from '../constants/images.js';
 import { formatItemCategory } from '../constants/categories.js';
 import { formatCalendarDate, formatDateTimeLocal } from '../utils/dateDisplay.js';
 
 export function ItemCard({ item }) {
   const isFound = item.type === 'found';
-  const city = item?.location?.trim?.() || '';
+  const city =
+    item?.city?.trim?.() || item?.location?.trim?.() || '';
+  const county = item?.county?.trim?.() || '';
   const country =
     item?.country != null && String(item.country).trim() ? String(item.country).trim() : '';
 
   return (
     <article className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
-      <div className="flex min-h-[200px] items-center justify-center bg-slate-100 py-2">
+      <div className={listingImageFrameClass}>
         {item.image ? (
           <img src={assetUrl(item.image)} alt="" className={listingImgClass} />
         ) : (
-          <div className="flex h-[200px] w-[200px] items-center justify-center text-4xl opacity-40">📦</div>
+          <div className={listingImagePlaceholderClass}>📦</div>
         )}
       </div>
       <div className="p-4 flex-1 flex flex-col gap-2">
@@ -38,10 +44,21 @@ export function ItemCard({ item }) {
               📍
             </span>
             <span className="break-words min-w-0">
-              <span className="font-medium text-slate-700">City: </span>
+              <span className="font-medium text-slate-700">City / area: </span>
               {city || <span className="text-slate-400">Not set</span>}
             </span>
           </p>
+          {county && (
+            <p className="flex items-start gap-1.5">
+              <span className="shrink-0" aria-hidden>
+                🏛
+              </span>
+              <span className="break-words min-w-0">
+                <span className="font-medium text-slate-700">County / district: </span>
+                {county}
+              </span>
+            </p>
+          )}
           <p className="flex items-start gap-1.5">
             <span className="shrink-0" aria-hidden>
               🌍

@@ -50,6 +50,17 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'claimyourlost-api' });
 });
 
+/** Browsers opening the API host root see this instead of a generic 404. The website UI is deployed separately. */
+app.get('/', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'claimyourlost-api',
+    message: 'API is running. This URL serves JSON only — the public site is hosted elsewhere.',
+    health: '/health',
+    routes: ['/auth', '/items', '/claims', '/messages', '/notifications'],
+  });
+});
+
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
@@ -60,12 +71,26 @@ app.use((err, _req, res, _next) => {
 });
 
 async function start() {
+  const onRender = process.env.RENDER === 'true' || Boolean(process.env.RENDER_EXTERNAL_URL);
+  console.log(
+    `[startup] NODE_ENV=${process.env.NODE_ENV || '(unset)'} PORT=${PORT} MONGODB_URI=${process.env.MONGODB_URI ? 'set' : 'MISSING'} RENDER=${onRender}`
+  );
+
+  const requireAtlas = process.env.NODE_ENV === 'production' || onRender;
+  if (requireAtlas && !process.env.MONGODB_URI) {
+    console.error(
+      '[startup] MONGODB_URI is required. In Render: Web Service → Environment → add MONGODB_URI (your Atlas connection string).'
+    );
+    process.exit(1);
+  }
+
   if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
     console.warn('Warning: JWT_SECRET is not set. Set a strong secret in production.');
   }
-  await connectDB();
-  const server = app.listen(PORT, () => {
-    console.log(`ClaimYourLost API listening on http://localhost:${PORT}`);
+
+  // Bind immediately so platforms like Render see an open port (PORT env). MongoDB connects after.
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`ClaimYourLost API listening on 0.0.0.0:${PORT}`);
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -77,6 +102,13 @@ async function start() {
     }
     process.exit(1);
   });
+
+  try {
+    await connectDB();
+  } catch (e) {
+    console.error('MongoDB connection failed:', e);
+    process.exit(1);
+  }
 }
 
 start().catch((e) => {
