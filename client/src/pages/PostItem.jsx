@@ -32,6 +32,8 @@ export function PostItem() {
   const [subcategory, setSubcategory] = useState('');
   const [subcategoryCustom, setSubcategoryCustom] = useState('');
   const [location, setLocation] = useState('');
+  const [city, setCity] = useState('');
+  const [county, setCounty] = useState('');
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [petBreed, setPetBreed] = useState('');
   const [contactUrgency, setContactUrgency] = useState('');
@@ -69,6 +71,11 @@ export function PostItem() {
       setError('Geolocation is not supported in this browser.');
       return;
     }
+    if (!window.isSecureContext) {
+      setError('GPS needs a secure site (HTTPS) or localhost. Open this page on https://claimyourlost.com or http://localhost.');
+      return;
+    }
+    setError('');
     setGeoLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -81,19 +88,29 @@ export function PostItem() {
             params: { lat: la, lng: ln },
           });
           if (data?.country) setCountry(String(data.country));
+          if (data?.city) setCity(String(data.city));
+          if (data?.county) setCounty(String(data.county));
           if (data?.city) {
             setLocation((prev) => (prev.trim() ? prev : String(data.city)));
           }
         } catch {
-          /* keep country field as-is */
+          setError('GPS found your coordinates, but city/country auto-fill failed. Please enter them manually.');
         }
         setGeoLoading(false);
       },
-      () => {
+      (geoErr) => {
         setGeoLoading(false);
+        if (geoErr?.code === 1) {
+          setError('Location permission denied. Allow location access in browser/site settings.');
+          return;
+        }
+        if (geoErr?.code === 3) {
+          setError('GPS request timed out. Move near open sky and try again.');
+          return;
+        }
         setError('Could not read GPS. You can still post with text location only.');
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 120000 }
     );
   }
 
@@ -125,6 +142,8 @@ export function PostItem() {
       form.append('subcategory', subcategory);
       form.append('subcategoryCustom', subcategoryCustom.trim());
       form.append('location', location.trim());
+      form.append('city', city.trim());
+      form.append('county', county.trim());
       form.append('country', country.trim());
       form.append('date', date);
       if (isPets) {
@@ -306,15 +325,41 @@ export function PostItem() {
           </div>
         )}
 
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="city" className="block text-sm font-medium text-slate-700 mb-1">
+              City
+            </label>
+            <input
+              id="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. Bengaluru"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-blue/30"
+            />
+          </div>
+          <div>
+            <label htmlFor="county" className="block text-sm font-medium text-slate-700 mb-1">
+              County / district
+            </label>
+            <input
+              id="county"
+              value={county}
+              onChange={(e) => setCounty(e.target.value)}
+              placeholder="e.g. Cook County, Gautam Buddha Nagar"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-blue/30"
+            />
+          </div>
+        </div>
         <div>
           <label htmlFor="loc" className="block text-sm font-medium text-slate-700 mb-1">
-            City / area
+            Area / landmark (optional)
           </label>
           <input
             id="loc"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Noida Sector 62"
+            placeholder="e.g. Noida Sector 62, near metro"
             className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-blue/30"
           />
           <div className="flex flex-wrap items-center gap-2 mt-2">
