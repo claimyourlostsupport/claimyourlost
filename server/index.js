@@ -11,6 +11,7 @@ import claimRoutes from './routes/claims.js';
 import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
+import { isCloudinaryEnabled } from './services/cloudinaryStorage.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
@@ -50,6 +51,16 @@ app.use('/admin', adminRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'claimyourlost-api' });
+});
+
+app.get('/health/storage', (_req, res) => {
+  const cloudinaryEnabled = isCloudinaryEnabled();
+  res.json({
+    ok: true,
+    storage: {
+      cloudinaryEnabled,
+    },
+  });
 });
 
 /** Browsers opening the API host root see this instead of a generic 404. The website UI is deployed separately. */
