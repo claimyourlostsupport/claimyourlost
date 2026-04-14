@@ -2,7 +2,7 @@
 export const LISTING_IMAGE_SIZE = 60;
 
 export const listingImgClass =
-  'w-[60px] h-[60px] max-w-full max-h-full object-cover shrink-0 rounded-lg';
+  'w-[60px] h-[60px] max-w-full max-h-full object-contain shrink-0 rounded-lg bg-slate-100';
 
 /** Card / detail frame around listing image */
 export const listingImageFrameClass = 'flex min-h-[60px] items-center justify-center bg-slate-100 py-2';
