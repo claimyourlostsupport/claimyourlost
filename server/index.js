@@ -10,6 +10,7 @@ import itemRoutes from './routes/items.js';
 import claimRoutes from './routes/claims.js';
 import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
+import adminRoutes from './routes/admin.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/items', itemRoutes);
 app.use('/claims', claimRoutes);
 app.use('/messages', messageRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/admin', adminRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'claimyourlost-api' });
