@@ -99,6 +99,64 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
+function normalizeReverseGeo(payload = {}) {
+  const addr = payload.address || payload || {};
+  const country = addr.country || addr.countryName || '';
+  const city =
+    addr.city ||
+    addr.town ||
+    addr.village ||
+    addr.municipality ||
+    addr.locality ||
+    addr.city_district ||
+    addr.state_district ||
+    addr.principalSubdivision ||
+    addr.state ||
+    '';
+  const county =
+    addr.county ||
+    addr.state_district ||
+    addr.localityInfo?.administrative?.[2]?.name ||
+    addr.localityInfo?.administrative?.[1]?.name ||
+    addr.region ||
+    addr.macroregion ||
+    '';
+  const displayName = payload.display_name || payload.locality || '';
+  return {
+    country: country ? String(country) : '',
+    city: city ? String(city) : '',
+    county: county ? String(county) : '',
+    displayName: displayName ? String(displayName) : '',
+  };
+}
+
+async function reverseGeoNominatim(lat, lng) {
+  const url = new URL('https://nominatim.openstreetmap.org/reverse');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('lon', String(lng));
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'ClaimYourLost/1.0 (claimyourlostsupport@gmail.com)',
+      Accept: 'application/json',
+    },
+  });
+  if (!r.ok) throw new Error(`nominatim ${r.status}`);
+  return normalizeReverseGeo(await r.json());
+}
+
+async function reverseGeoBigDataCloud(lat, lng) {
+  const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
+  url.searchParams.set('latitude', String(lat));
+  url.searchParams.set('longitude', String(lng));
+  url.searchParams.set('localityLanguage', 'en');
+  const r = await fetch(url, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!r.ok) throw new Error(`bigdatacloud ${r.status}`);
+  return normalizeReverseGeo(await r.json());
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -372,42 +430,20 @@ router.get('/reverse-geocode', async (req, res) => {
     if (lat == null || lng == null) {
       return res.status(400).json({ error: 'lat and lng query params required' });
     }
-    const url = new URL('https://nominatim.openstreetmap.org/reverse');
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('lat', String(lat));
-    url.searchParams.set('lon', String(lng));
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'ClaimYourLost/1.0 (claimyourlostsupport@gmail.com)',
-        Accept: 'application/json',
-      },
-    });
-    if (!r.ok) {
+    try {
+      const primary = await reverseGeoNominatim(lat, lng);
+      return res.json(primary);
+    } catch (primaryErr) {
+      console.warn('reverse-geocode nominatim failed:', primaryErr?.message || primaryErr);
+    }
+
+    try {
+      const fallback = await reverseGeoBigDataCloud(lat, lng);
+      return res.json(fallback);
+    } catch (fallbackErr) {
+      console.warn('reverse-geocode bigdatacloud failed:', fallbackErr?.message || fallbackErr);
       return res.status(502).json({ error: 'Geocoding service unavailable' });
     }
-    const data = await r.json();
-    const addr = data.address || {};
-    const country = addr.country || '';
-    const city =
-      addr.city ||
-      addr.town ||
-      addr.village ||
-      addr.municipality ||
-      addr.state_district ||
-      addr.state ||
-      '';
-    const county =
-      addr.county ||
-      addr.state_district ||
-      addr.region ||
-      addr.macroregion ||
-      '';
-    res.json({
-      country: country ? String(country) : '',
-      city: city ? String(city) : '',
-      county: county ? String(county) : '',
-      displayName: data.display_name ? String(data.display_name) : '',
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Reverse geocode failed' });
