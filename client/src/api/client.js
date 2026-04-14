@@ -18,5 +18,10 @@ export function setAuthToken(token) {
 export function assetUrl(path) {
   if (!path) return '';
   if (path.startsWith('http')) return path;
+  // Uploaded image paths are stored as relative URLs like "/uploads/file.jpg".
+  // In production frontend/backend are on different domains, so prefix API origin.
+  if (baseURL.startsWith('http')) {
+    return `${baseURL.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+  }
   return path;
 }
