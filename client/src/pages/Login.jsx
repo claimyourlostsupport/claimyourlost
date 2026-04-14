@@ -14,7 +14,7 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hint, setHint] = useState('');
-  const [otpMode, setOtpMode] = useState('mock');
+  const [otpMode, setOtpMode] = useState('phone_last6');
 
   async function handleRequestOtp(e) {
     e.preventDefault();
@@ -22,12 +22,8 @@ export function Login() {
     setLoading(true);
     try {
       const { data } = await requestOtp(phone);
-      setOtpMode(data.mode === 'sms' ? 'sms' : 'mock');
-      if (data.mode === 'sms') {
-        setHint('Enter the 6-digit code sent to your phone.');
-      } else {
-        setHint(data.mockHint || 'Use any 6-digit code (e.g. 123456).');
-      }
+      setOtpMode(data.mode || 'phone_last6');
+      setHint(data.hint || 'Enter the last 6 digits of your phone number.');
       setStep('otp');
     } catch (err) {
       setError(err.response?.data?.error || 'Could not send OTP');
@@ -53,14 +49,15 @@ export function Login() {
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Temporary login mode: SMS OTP is disabled. Use the last 6 digits of your phone number to verify.
+        </div>
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
           <p className="text-sm text-slate-600">
             {step === 'phone'
-              ? 'Sign in with your phone. We will send or simulate a one-time code.'
-              : otpMode === 'sms'
-                ? 'Enter the code we sent by SMS.'
-                : 'Demo mode: use any 6 digits to verify.'}
+              ? 'Sign in with your phone. Tap Send OTP to continue.'
+              : 'Enter the last 6 digits of your phone number to verify.'}
           </p>
         </div>
 
@@ -109,7 +106,7 @@ export function Login() {
             {hint && <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{hint}</p>}
             <div>
               <label htmlFor="otp" className="block text-sm font-medium text-slate-700 mb-1">
-                6-digit OTP
+                6-digit OTP (last 6 digits of phone)
               </label>
               <input
                 id="otp"

@@ -1,14 +1,21 @@
-import crypto from 'crypto';
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
-import { setOtp, verifyAndConsumeOtp } from '../services/otpStore.js';
-import { sendOtpSms, isTwilioEnabled } from '../services/sms.js';
 
 const router = Router();
 
 function isSixDigits(otp) {
   return typeof otp === 'string' && /^\d{6}$/.test(otp.trim());
+}
+
+function normalizePhone(phone) {
+  return String(phone || '').replace(/\s/g, '').trim();
+}
+
+function lastSixDigitsOfPhone(phone) {
+  const digits = normalizePhone(phone).replace(/\D/g, '');
+  if (digits.length < 6) return '';
+  return digits.slice(-6);
 }
 
 router.post('/login', async (req, res) => {
@@ -21,13 +28,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Enter a 6-digit OTP' });
     }
 
-    const normalized = phone.replace(/\s/g, '').trim();
-
-    if (isTwilioEnabled()) {
-      const ok = verifyAndConsumeOtp(normalized, otp);
-      if (!ok) {
-        return res.status(400).json({ error: 'Invalid or expired OTP' });
-      }
+    const normalized = normalizePhone(phone);
+    const expectedOtp = lastSixDigitsOfPhone(normalized);
+    if (!expectedOtp) {
+      return res.status(400).json({ error: 'Phone number must contain at least 6 digits' });
+    }
+    if (String(otp).trim() !== expectedOtp) {
+      return res.status(400).json({ error: 'Invalid OTP. Enter the last 6 digits of your phone number.' });
     }
 
     let user = await User.findOne({ phone: normalized });
@@ -56,25 +63,15 @@ router.post('/request-otp', async (req, res) => {
     if (!phone || typeof phone !== 'string' || phone.replace(/\s/g, '').length < 8) {
       return res.status(400).json({ error: 'Valid phone number is required' });
     }
-    const normalized = phone.replace(/\s/g, '').trim();
-
-    if (isTwilioEnabled()) {
-      const code = String(crypto.randomInt(100000, 1000000));
-      setOtp(normalized, code);
-      const result = await sendOtpSms(normalized, code);
-      if (!result.sent) {
-        return res.status(503).json({ error: 'SMS could not be sent' });
-      }
-      return res.json({
-        message: 'OTP sent to your phone.',
-        mode: 'sms',
-      });
+    const normalized = normalizePhone(phone);
+    const hintOtp = lastSixDigitsOfPhone(normalized);
+    if (!hintOtp) {
+      return res.status(400).json({ error: 'Phone number must contain at least 6 digits' });
     }
-
     res.json({
-      message: 'OTP not required (mock mode). Use any 6 digits to verify.',
-      mode: 'mock',
-      mockHint: process.env.NODE_ENV !== 'production' ? 'Try: 123456' : undefined,
+      message: 'Use the last 6 digits of your phone number as OTP.',
+      mode: 'phone_last6',
+      hint: `Enter last 6 digits of ${normalized}`,
     });
   } catch (err) {
     console.error(err);
