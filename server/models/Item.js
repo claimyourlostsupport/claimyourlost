@@ -15,6 +15,7 @@ const itemSchema = new mongoose.Schema(
     petBreed: { type: String, default: '', trim: true },
     contactUrgency: { type: String, default: '', trim: true },
     image: { type: String, default: '' },
+    imagePublicId: { type: String, default: '', trim: true },
     location: { type: String, default: '', trim: true },
     city: { type: String, default: '', trim: true },
     county: { type: String, default: '', trim: true },

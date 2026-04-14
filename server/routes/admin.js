@@ -8,6 +8,7 @@ import { Item } from '../models/Item.js';
 import { Message } from '../models/Message.js';
 import { Claim } from '../models/Claim.js';
 import { Notification } from '../models/Notification.js';
+import { deleteCloudinaryImage, isCloudinaryEnabled } from '../services/cloudinaryStorage.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,12 @@ async function removeUploadedFileForItem(item) {
   }
 }
 
+async function removeCloudinaryImageForItem(item) {
+  const publicId = String(item?.imagePublicId || '').trim();
+  if (!publicId) return false;
+  return deleteCloudinaryImage(publicId);
+}
+
 /**
  * Production-safe reset endpoint for test environments.
  * Required:
@@ -83,6 +90,7 @@ router.post('/clear-all-items', async (req, res) => {
       return res.status(400).json({ error: 'Missing confirm=DELETE_ALL_ITEMS' });
     }
 
+    const allItems = await Item.find({}).select('_id image imagePublicId').lean();
     const msg = await Message.deleteMany({});
     const cl = await Claim.deleteMany({});
     const notif = await Notification.deleteMany({});
@@ -90,6 +98,12 @@ router.post('/clear-all-items', async (req, res) => {
 
     const uploadDir = path.join(__dirname, '..', 'uploads');
     const filesRemoved = await clearUploadsDir(uploadDir);
+    let cloudinaryRemoved = 0;
+    if (isCloudinaryEnabled()) {
+      for (const it of allItems) {
+        if (await removeCloudinaryImageForItem(it)) cloudinaryRemoved += 1;
+      }
+    }
 
     return res.json({
       ok: true,
@@ -99,6 +113,7 @@ router.post('/clear-all-items', async (req, res) => {
         notifications: notif.deletedCount || 0,
         items: items.deletedCount || 0,
         uploadFiles: filesRemoved,
+        cloudinaryImages: cloudinaryRemoved,
       },
     });
   } catch (err) {
@@ -145,6 +160,7 @@ router.post('/clear-item/:itemId', async (req, res) => {
     });
     const deletedItem = await Item.deleteOne({ _id: itemId });
     const removedImage = await removeUploadedFileForItem(item);
+    const removedCloudinary = await removeCloudinaryImageForItem(item);
 
     return res.json({
       ok: true,
@@ -154,6 +170,7 @@ router.post('/clear-item/:itemId', async (req, res) => {
         notifications: notif.deletedCount || 0,
         items: deletedItem.deletedCount || 0,
         imageFileRemoved: removedImage,
+        cloudinaryImageRemoved: removedCloudinary,
       },
     });
   } catch (err) {

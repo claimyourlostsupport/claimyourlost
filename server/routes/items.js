@@ -7,6 +7,7 @@ import { Item } from '../models/Item.js';
 import { requireAuth } from '../middleware/auth.js';
 import { notifyPotentialMatches } from '../services/matchNotifications.js';
 import { optimizeUploadedImage } from '../services/imageOptimize.js';
+import { isCloudinaryEnabled, uploadImageToCloudinary } from '../services/cloudinaryStorage.js';
 import { categoryMongoFilter } from '../utils/categoryFilter.js';
 
 function parseCoord(v) {
@@ -218,10 +219,23 @@ router.post('/', requireAuth, (req, res, next) => {
     }
 
     let imagePath = '';
+    let imagePublicId = '';
     if (req.file) {
       try {
         const finalName = await optimizeUploadedImage(req.file.path);
-        imagePath = `/uploads/${finalName}`;
+        const localOptimizedPath = path.join(uploadDir, finalName);
+        if (isCloudinaryEnabled()) {
+          const uploaded = await uploadImageToCloudinary(localOptimizedPath);
+          imagePath = uploaded.secureUrl;
+          imagePublicId = uploaded.publicId;
+          try {
+            fs.unlinkSync(localOptimizedPath);
+          } catch {
+            /* ignore */
+          }
+        } else {
+          imagePath = `/uploads/${finalName}`;
+        }
       } catch (imgErr) {
         console.error('Image optimize failed:', imgErr);
         try {
@@ -268,6 +282,7 @@ router.post('/', requireAuth, (req, res, next) => {
       date: itemDate,
       userId: req.userId,
       image: imagePath,
+      imagePublicId,
     });
 
     const populated = await Item.findById(item._id).populate('userId', 'phone');
