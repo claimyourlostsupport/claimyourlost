@@ -8,7 +8,6 @@ import { Item } from '../models/Item.js';
 import { Message } from '../models/Message.js';
 import { Claim } from '../models/Claim.js';
 import { Notification } from '../models/Notification.js';
-import { ItemReport } from '../models/ItemReport.js';
 import { deleteCloudinaryImage, isCloudinaryEnabled } from '../services/cloudinaryStorage.js';
 
 const router = Router();
@@ -95,7 +94,6 @@ router.post('/clear-all-items', async (req, res) => {
     const msg = await Message.deleteMany({});
     const cl = await Claim.deleteMany({});
     const notif = await Notification.deleteMany({});
-    const reports = await ItemReport.deleteMany({});
     const items = await Item.deleteMany({});
 
     const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -113,7 +111,6 @@ router.post('/clear-all-items', async (req, res) => {
         messages: msg.deletedCount || 0,
         claims: cl.deletedCount || 0,
         notifications: notif.deletedCount || 0,
-        reports: reports.deletedCount || 0,
         items: items.deletedCount || 0,
         uploadFiles: filesRemoved,
         cloudinaryImages: cloudinaryRemoved,
@@ -158,7 +155,6 @@ router.post('/clear-item/:itemId', async (req, res) => {
 
     const msg = await Message.deleteMany({ itemId });
     const cl = await Claim.deleteMany({ itemId });
-    const reports = await ItemReport.deleteMany({ itemId });
     const notif = await Notification.deleteMany({
       $or: [{ relatedItemId: itemId }, { matchedItemId: itemId }],
     });
@@ -171,7 +167,6 @@ router.post('/clear-item/:itemId', async (req, res) => {
       deleted: {
         messages: msg.deletedCount || 0,
         claims: cl.deletedCount || 0,
-        reports: reports.deletedCount || 0,
         notifications: notif.deletedCount || 0,
         items: deletedItem.deletedCount || 0,
         imageFileRemoved: removedImage,

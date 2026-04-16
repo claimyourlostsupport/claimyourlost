@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Item } from '../models/Item.js';
-import { ItemReport } from '../models/ItemReport.js';
 import { requireAuth } from '../middleware/auth.js';
 import { notifyPotentialMatches } from '../services/matchNotifications.js';
 import { optimizeUploadedImage } from '../services/imageOptimize.js';
@@ -570,28 +569,6 @@ router.post('/:id/react', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update reaction' });
-  }
-});
-
-router.post('/:id/report', requireAuth, async (req, res) => {
-  try {
-    const description = String(req.body?.description || '').trim();
-    if (description.length < 4) {
-      return res.status(400).json({ error: 'Please enter report details (min 4 chars)' });
-    }
-    const item = await Item.findById(req.params.id).select('_id').lean();
-    if (!item) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    await ItemReport.create({
-      itemId: item._id,
-      reporterId: req.userId,
-      description: description.slice(0, 1000),
-    });
-    res.json({ ok: true, message: 'Issue Reported' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to submit report' });
   }
 });
 

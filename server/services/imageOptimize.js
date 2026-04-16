@@ -2,8 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 
-/** Stored images fit inside a square; default 60×60 px. Override with IMAGE_MAX_EDGE (1–2000). */
-const MAX_EDGE = Math.min(2000, Math.max(1, parseInt(process.env.IMAGE_MAX_EDGE || '60', 10) || 60));
+/** Stored images fit inside a square; default 120×120 px. Override with IMAGE_MAX_EDGE (1–2000). */
+const MAX_EDGE = Math.min(2000, Math.max(1, parseInt(process.env.IMAGE_MAX_EDGE || '120', 10) || 120));
 const JPEG_QUALITY = Math.min(95, Math.max(60, parseInt(process.env.IMAGE_JPEG_QUALITY || '80', 10) || 80));
 
 function jpegOptions(useMozjpeg) {

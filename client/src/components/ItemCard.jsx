@@ -18,6 +18,7 @@ export function ItemCard({ item }) {
   const [reactLoading, setReactLoading] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const isFound = item.type === 'found';
   const city =
@@ -25,6 +26,12 @@ export function ItemCard({ item }) {
   const country =
     item?.country != null && String(item.country).trim() ? String(item.country).trim() : '';
   const description = String(item?.description || '').trim();
+  const subcategory = String(item?.subcategory || '').trim().toLowerCase();
+  const customSubType = String(item?.subcategoryCustom || '').trim();
+  const categoryLine =
+    subcategory === 'other'
+      ? customSubType || ''
+      : formatItemCategory(item).replace(/\s*·\s*Other$/i, '');
   const showSeeMore = description.length > 70;
   const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const listingUrl = `${siteBase.replace(/\/$/, '')}/items/${item._id}`;
@@ -51,21 +58,9 @@ export function ItemCard({ item }) {
     window.open(wa, '_blank', 'noopener,noreferrer');
   }
 
-  async function reportItem() {
+  function reportItem() {
     setOverflowOpen(false);
-    if (!isAuthenticated) {
-      window.alert('Please log in to report this item.');
-      return;
-    }
-    const text = window.prompt('Describe the issue for review:');
-    const description = String(text || '').trim();
-    if (!description) return;
-    try {
-      await api.post(`/items/${item._id}/report`, { description });
-      window.alert('Issue Reported');
-    } catch (e) {
-      window.alert(e?.response?.data?.error || 'Could not submit report');
-    }
+    window.alert('Flagged for review.');
   }
 
   function hideItem() {
@@ -160,9 +155,11 @@ export function ItemCard({ item }) {
             >
               {isFound ? 'FOUND' : 'LOST'}
             </span>
-            <p className="text-[11px] text-slate-500 truncate">
-              {formatItemCategory(item)}
-            </p>
+            {categoryLine && (
+              <p className="text-[11px] text-slate-500 truncate">
+                {categoryLine}
+              </p>
+            )}
           </div>
 
           <h3 className="font-semibold text-slate-900 line-clamp-2">{item.title}</h3>
@@ -202,10 +199,17 @@ export function ItemCard({ item }) {
           )}
         </div>
 
-        <div className="relative flex h-[96px] w-[96px] items-center justify-center rounded-xl bg-slate-100 shrink-0 overflow-visible">
+        <div className="relative flex h-[120px] w-[120px] items-center justify-center rounded-xl bg-slate-100 shrink-0 overflow-visible">
           <div className="h-full w-full rounded-xl overflow-hidden">
             {item.image ? (
-              <img src={assetUrl(item.image)} alt="" className="h-full w-full object-contain rounded-lg bg-slate-100" />
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="block h-full w-full"
+                title="Open image"
+              >
+                <img src={assetUrl(item.image)} alt="" className="h-full w-full object-contain rounded-lg bg-slate-100" />
+              </button>
             ) : (
               <div className={listingImagePlaceholderClass}>📦</div>
             )}
@@ -213,10 +217,33 @@ export function ItemCard({ item }) {
         </div>
       </div>
 
+      {previewOpen && item.image && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div className="relative max-w-3xl w-full">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="absolute -top-10 right-0 text-white text-sm font-semibold"
+            >
+              Close ✕
+            </button>
+            <img
+              src={assetUrl(item.image)}
+              alt=""
+              className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="mt-2 flex items-center gap-2.5">
         <Link
           to={`/items/${item._id}`}
-          className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold leading-none hover:bg-slate-800 transition-colors shrink-0"
+          className="inline-flex items-center whitespace-nowrap px-3 py-1.5 rounded-lg bg-white border border-slate-300 shadow-sm text-slate-800 text-xs font-semibold leading-none hover:bg-slate-50 transition-colors shrink-0"
         >
           View details
         </Link>
