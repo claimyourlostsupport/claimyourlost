@@ -33,6 +33,22 @@ const itemSchema = new mongoose.Schema(
       enum: ['open', 'claimed', 'resolved'],
       default: 'open',
     },
+    reactions: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        value: {
+          type: String,
+          enum: ['like', 'dislike'],
+          required: true,
+        },
+      },
+    ],
+    likesCount: { type: Number, default: 0 },
+    dislikesCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

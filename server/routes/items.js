@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Item } from '../models/Item.js';
+import { ItemReport } from '../models/ItemReport.js';
 import { requireAuth } from '../middleware/auth.js';
 import { notifyPotentialMatches } from '../services/matchNotifications.js';
 import { optimizeUploadedImage } from '../services/imageOptimize.js';
@@ -521,6 +522,76 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load item' });
+  }
+});
+
+router.post('/:id/react', requireAuth, async (req, res) => {
+  try {
+    const value = String(req.body?.value || '').trim().toLowerCase();
+    if (!['like', 'dislike', ''].includes(value)) {
+      return res.status(400).json({ error: 'value must be like, dislike, or empty' });
+    }
+
+    const item = await Item.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const uid = String(req.userId);
+    const idx = (item.reactions || []).findIndex((r) => String(r.userId) === uid);
+    const prev = idx >= 0 ? String(item.reactions[idx].value) : '';
+
+    if (!value) {
+      if (idx >= 0) {
+        item.reactions.splice(idx, 1);
+        if (prev === 'like') item.likesCount = Math.max(0, (item.likesCount || 0) - 1);
+        if (prev === 'dislike') item.dislikesCount = Math.max(0, (item.dislikesCount || 0) - 1);
+      }
+    } else if (idx < 0) {
+      item.reactions.push({ userId: req.userId, value });
+      if (value === 'like') item.likesCount = (item.likesCount || 0) + 1;
+      if (value === 'dislike') item.dislikesCount = (item.dislikesCount || 0) + 1;
+    } else if (prev !== value) {
+      item.reactions[idx].value = value;
+      if (prev === 'like') item.likesCount = Math.max(0, (item.likesCount || 0) - 1);
+      if (prev === 'dislike') item.dislikesCount = Math.max(0, (item.dislikesCount || 0) - 1);
+      if (value === 'like') item.likesCount = (item.likesCount || 0) + 1;
+      if (value === 'dislike') item.dislikesCount = (item.dislikesCount || 0) + 1;
+    }
+
+    await item.save();
+    const userReaction = value || '';
+    res.json({
+      ok: true,
+      likesCount: item.likesCount || 0,
+      dislikesCount: item.dislikesCount || 0,
+      userReaction,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update reaction' });
+  }
+});
+
+router.post('/:id/report', requireAuth, async (req, res) => {
+  try {
+    const description = String(req.body?.description || '').trim();
+    if (description.length < 4) {
+      return res.status(400).json({ error: 'Please enter report details (min 4 chars)' });
+    }
+    const item = await Item.findById(req.params.id).select('_id').lean();
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    await ItemReport.create({
+      itemId: item._id,
+      reporterId: req.userId,
+      description: description.slice(0, 1000),
+    });
+    res.json({ ok: true, message: 'Issue Reported' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to submit report' });
   }
 });
 

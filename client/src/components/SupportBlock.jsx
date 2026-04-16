@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL, PAYPAL_DONATION_EMAIL, paypalSupportUrl } from '../constants/support.js';
+import { SUPPORT_EMAIL, paypalSupportUrl } from '../constants/support.js';
 
 /**
  * @param {'default' | 'compact'} variant
@@ -28,7 +28,6 @@ export function SupportBlock({ variant = 'default' }) {
         <p className="text-sm text-slate-600 mb-2">
           Contributions help with hosting and improvements. We use a normal PayPal payment link (not charity checkout).
         </p>
-        <p className="text-xs text-slate-500 mb-3">Recipient: {PAYPAL_DONATION_EMAIL}</p>
         <a
           href={paypalSupportUrl}
           target="_blank"
