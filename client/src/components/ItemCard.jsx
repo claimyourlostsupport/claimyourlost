@@ -213,7 +213,7 @@ export function ItemCard({ item }) {
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2.5">
         <Link
           to={`/items/${item._id}`}
           className="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-semibold leading-none hover:bg-slate-800 transition-colors shrink-0"
@@ -221,8 +221,8 @@ export function ItemCard({ item }) {
           View details
         </Link>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 text-base flex-wrap ml-1">
-          <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-base flex-nowrap ml-1 min-w-0">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-1.5 py-0.5">
             <button
               type="button"
               onClick={toggleVote}
@@ -257,7 +257,7 @@ export function ItemCard({ item }) {
               <path d="M20.52 3.48A11.78 11.78 0 0 0 12.07 0C5.56 0 .23 5.3.23 11.82c0 2.08.54 4.1 1.56 5.88L0 24l6.49-1.7a11.79 11.79 0 0 0 5.58 1.42h.01c6.51 0 11.84-5.3 11.84-11.82 0-3.16-1.23-6.13-3.4-8.42Zm-8.45 18.2h-.01a9.84 9.84 0 0 1-5.02-1.38l-.36-.21-3.85 1.01 1.03-3.75-.23-.38a9.8 9.8 0 0 1-1.5-5.15c0-5.44 4.44-9.87 9.9-9.87 2.64 0 5.11 1.02 6.98 2.89a9.8 9.8 0 0 1 2.9 6.98c0 5.44-4.45 9.86-9.84 9.86Zm5.41-7.37c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.8.37-.27.3-1.05 1.02-1.05 2.5 0 1.47 1.08 2.9 1.23 3.1.15.2 2.12 3.24 5.14 4.54.72.31 1.28.49 1.72.63.72.23 1.37.2 1.89.12.58-.09 1.76-.72 2-1.42.25-.7.25-1.29.17-1.42-.07-.12-.27-.2-.57-.35Z" />
             </svg>
           </button>
-          <div className="relative">
+          <div className="relative ml-1">
             <button
               type="button"
               onClick={() => setShareOpen((x) => !x)}
