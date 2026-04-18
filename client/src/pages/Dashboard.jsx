@@ -160,7 +160,7 @@ export function Dashboard() {
                         <Link
                           to={`/items/${String(n.matchedItemId)}`}
                           onClick={() => !n.read && markRead(n._id)}
-                          className="text-sm font-semibold text-slate-600 hover:underline"
+                          className="text-sm font-semibold text-brand-blue hover:underline"
                         >
                           Matched listing
                         </Link>

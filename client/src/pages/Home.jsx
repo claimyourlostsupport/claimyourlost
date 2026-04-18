@@ -136,7 +136,7 @@ export function Home() {
         </form>
 
         <div
-          className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 pt-1"
+          className="flex flex-row flex-wrap items-center justify-center gap-x-3 gap-y-2 pt-1 text-center"
           role="radiogroup"
           aria-label="Listing region"
         >
@@ -184,7 +184,7 @@ export function Home() {
           </div>
         </div>
         {scope === 'country' && !country.trim() && (
-          <p className="text-[10px] leading-snug text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5">
+          <p className="text-[10px] leading-snug text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 text-center">
             Set country from ⋮ menu, or choose World.
           </p>
         )}
