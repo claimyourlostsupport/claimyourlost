@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { api, setAuthToken } from '../api/client';
 import {
   clearPersistedClientState,
@@ -77,18 +78,18 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!token) return;
-    let cancelled = false;
+    const ac = new AbortController();
     (async () => {
       try {
-        const { data } = await api.get('/auth/me');
-        if (!cancelled && data?.user) persistUser(data.user);
+        const { data } = await api.get('/auth/me', { signal: ac.signal });
+        if (data?.user) persistUser(data.user);
       } catch (err) {
-        if (!cancelled) invalidateSessionIfNeeded(err);
+        if (ac.signal.aborted || axios.isCancel?.(err)) return;
+        if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return;
+        invalidateSessionIfNeeded(err);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => ac.abort();
   }, [token, persistUser, invalidateSessionIfNeeded]);
 
   const login = async (phone, otp) => {

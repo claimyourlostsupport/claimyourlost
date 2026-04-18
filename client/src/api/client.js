@@ -22,6 +22,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+function requestHadAuthorization(config) {
+  if (!config?.headers) return false;
+  const h = config.headers;
+  return Boolean(
+    h.Authorization ||
+      h.authorization ||
+      (typeof h.get === 'function' && (h.get('Authorization') || h.get('authorization')))
+  );
+}
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -30,7 +40,10 @@ api.interceptors.response.use(
     if (status === 401) {
       const isPublicAuth =
         path.includes('auth/login') || path.includes('auth/request-otp');
-      if (!isPublicAuth) {
+      // Only wipe storage when the server rejected a request that actually sent a Bearer token.
+      // A 401 with no Authorization header is often a race before axios defaults are applied;
+      // clearing cyl_token here caused "logged out on refresh" for valid sessions.
+      if (!isPublicAuth && requestHadAuthorization(err.config)) {
         clearPersistedClientState();
       }
     }
