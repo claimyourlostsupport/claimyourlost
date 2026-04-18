@@ -32,6 +32,61 @@ export async function clearUploadsDir(uploadDir) {
   return removed;
 }
 
+async function unlinkSocialLocalMedia(post) {
+  const p = String(post?.mediaUrl || '').trim();
+  if (!p || !p.startsWith('/uploads/')) return false;
+  const filename = p.replace('/uploads/', '').trim();
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return false;
+  }
+  const uploadDir = path.join(__dirname, '..', 'uploads');
+  const full = path.join(uploadDir, filename);
+  try {
+    await fs.unlink(full);
+    return true;
+  } catch (e) {
+    if (e.code === 'ENOENT') return false;
+    throw e;
+  }
+}
+
+/**
+ * Deletes every SocialHub post, their chat messages and related notifications, and each
+ * post’s local / Cloudinary media. Does not touch lost & found items, users, or item messages.
+ */
+export async function executeDeleteAllSocialPosts() {
+  const allSocial = await SocialPost.find({}).select('_id mediaUrl imagePublicId mediaType').lean();
+
+  let cloudinarySocial = 0;
+  if (isCloudinaryEnabled()) {
+    for (const sp of allSocial) {
+      const pid = String(sp?.imagePublicId || '').trim();
+      if (!pid) continue;
+      const rt = sp.mediaType === 'video' ? 'video' : 'image';
+      if (await deleteCloudinaryMedia(pid, rt)) cloudinarySocial += 1;
+    }
+  }
+
+  let localFilesRemoved = 0;
+  for (const sp of allSocial) {
+    if (await unlinkSocialLocalMedia(sp)) localFilesRemoved += 1;
+  }
+
+  const msg = await Message.deleteMany({ socialPostId: { $exists: true, $ne: null } });
+  const notif = await Notification.deleteMany({
+    relatedSocialPostId: { $exists: true, $ne: null },
+  });
+  const posts = await SocialPost.deleteMany({});
+
+  return {
+    messages: msg.deletedCount || 0,
+    notifications: notif.deletedCount || 0,
+    socialPosts: posts.deletedCount || 0,
+    uploadFiles: localFilesRemoved,
+    cloudinarySocial: cloudinarySocial,
+  };
+}
+
 /**
  * Wipes app data for local/test resets: Mongo collections (items, social posts, users,
  * messages, claims, notifications), local files in server/uploads, and Cloudinary assets

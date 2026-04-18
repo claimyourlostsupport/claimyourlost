@@ -10,7 +10,7 @@ import { Claim } from '../models/Claim.js';
 import { Notification } from '../models/Notification.js';
 import { SocialPost } from '../models/SocialPost.js';
 import { deleteCloudinaryImage, deleteCloudinaryMedia } from '../services/cloudinaryStorage.js';
-import { executeFullDataReset } from '../services/fullDataReset.js';
+import { executeFullDataReset, executeDeleteAllSocialPosts } from '../services/fullDataReset.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +22,7 @@ router.get('/', (_req, res) => {
     service: 'admin',
     posts: [
       'POST /admin/clear-all-items',
+      'POST /admin/clear-all-social-posts',
       'POST /admin/clear-item/:itemId',
       'POST /admin/clear-social-post/:postId',
     ],
@@ -134,6 +135,47 @@ router.post('/clear-all-items', async (req, res) => {
   } catch (err) {
     console.error('clear-all-items failed:', err);
     return res.status(500).json({ error: 'Failed to clear data' });
+  }
+});
+
+/**
+ * Deletes all SocialHub posts (and their messages + notifications + media only).
+ * Does not delete lost & found listings or users.
+ *
+ * Required:
+ * - Header: x-admin-token: <CLEAR_DATA_TOKEN>
+ * - Body: { "confirm": "DELETE_ALL_SOCIAL_POSTS" }
+ */
+router.post('/clear-all-social-posts', async (req, res) => {
+  try {
+    const auth = hasValidAdminToken(req);
+    if (!auth.ok && auth.reason === 'missing_server_token') {
+      return res.status(503).json({ error: 'CLEAR_DATA_TOKEN is not configured' });
+    }
+    if (!auth.ok) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const confirm = String(req.body?.confirm || '').trim();
+    if (confirm !== 'DELETE_ALL_SOCIAL_POSTS') {
+      return res.status(400).json({ error: 'Missing confirm=DELETE_ALL_SOCIAL_POSTS' });
+    }
+
+    const deleted = await executeDeleteAllSocialPosts();
+
+    return res.json({
+      ok: true,
+      deleted: {
+        messages: deleted.messages,
+        notifications: deleted.notifications,
+        socialPosts: deleted.socialPosts,
+        uploadFiles: deleted.uploadFiles,
+        cloudinarySocial: deleted.cloudinarySocial,
+      },
+    });
+  } catch (err) {
+    console.error('clear-all-social-posts failed:', err);
+    return res.status(500).json({ error: 'Failed to clear social posts' });
   }
 });
 

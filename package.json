@@ -10,7 +10,8 @@
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build:client": "npm run build --prefix client",
-    "clean-all": "npm run clean-all --prefix server"
+    "clean-all": "npm run clean-all --prefix server",
+    "clear-social-posts": "npm run clear-social-posts --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
