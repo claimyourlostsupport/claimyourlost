@@ -47,10 +47,11 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  /** User deleted or JWT rejected — wipe localStorage; event listener below syncs React state. */
+  /** JWT rejected or account gone — wipe localStorage; event listener below syncs React state.
+   * Do not use 404 here: misconfigured proxies/CDNs often return 404 for API routes; that must not log users out. */
   const invalidateSessionIfNeeded = useCallback((err) => {
     const status = err?.response?.status;
-    if (status === 401 || status === 404) {
+    if (status === 401) {
       clearPersistedClientState();
     }
   }, []);

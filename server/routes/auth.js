@@ -91,7 +91,8 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).lean();
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      // 401 (not 404): JWT is valid but the account no longer exists — treat as invalid session.
+      return res.status(401).json({ error: 'User not found' });
     }
     res.json({
       user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
@@ -111,7 +112,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     const nickname = raw == null || raw === '' ? '' : String(raw).trim().slice(0, 48);
     const user = await User.findByIdAndUpdate(req.userId, { $set: { nickname } }, { new: true }).lean();
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'User not found' });
     }
     res.json({
       user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
