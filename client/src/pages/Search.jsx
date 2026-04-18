@@ -4,6 +4,37 @@ import { api } from '../api/client';
 import { ItemCard } from '../components/ItemCard.jsx';
 import { MAIN_CATEGORIES, getMainCategory } from '../constants/categories.js';
 import { mergeCountryOptions } from '../constants/countries.js';
+import { useBrowseScope } from '../context/BrowseScopeContext.jsx';
+
+const SEARCH_LOCATION_PREFS_KEY = 'cyl_search_location_prefs';
+
+function readLocationPrefs() {
+  try {
+    const raw = localStorage.getItem(SEARCH_LOCATION_PREFS_KEY);
+    if (!raw) return { country: '', city: '' };
+    const p = JSON.parse(raw);
+    return {
+      country: String(p?.country || '').trim(),
+      city: String(p?.city || '').trim(),
+    };
+  } catch {
+    return { country: '', city: '' };
+  }
+}
+
+function writeLocationPrefs(country, city) {
+  try {
+    localStorage.setItem(
+      SEARCH_LOCATION_PREFS_KEY,
+      JSON.stringify({
+        country: String(country || '').trim(),
+        city: String(city || '').trim(),
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
 
 function searchApiParams({
   q,
@@ -33,6 +64,7 @@ function searchApiParams({
 
 export function Search() {
   const [params, setParams] = useSearchParams();
+  const { country: browseCountry } = useBrowseScope();
   const q = params.get('q') || '';
   const type = params.get('type') || '';
   const category = params.get('category') || 'all';
@@ -50,10 +82,13 @@ export function Search() {
   const [nearbyMode, setNearbyMode] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geo, setGeo] = useState(null);
+  const [nearKm, setNearKm] = useState(25);
   const [countryList, setCountryList] = useState([]);
   const [cityList, setCityList] = useState([]);
   const [countyList, setCountyList] = useState([]);
   const [nearbyFallback, setNearbyFallback] = useState(false);
+  const [advOpen, setAdvOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   const mainMeta = category !== 'all' ? getMainCategory(category) : null;
 
@@ -128,6 +163,75 @@ export function Search() {
     setLocalQ(q);
   }, [q]);
 
+  /**
+   * When URL has no country and no city: fill from GPS (once per tab session), else saved prefs,
+   * else header browse country (BrowseScope). Re-runs when browseCountry arrives after first paint.
+   */
+  useEffect(() => {
+    const needsLocationDefaults =
+      (country === 'all' || !country) && !String(city || '').trim();
+    if (!needsLocationDefaults) return;
+
+    let cancelled = false;
+    (async () => {
+      let nextCountry = '';
+      let nextCity = '';
+      let gpsAttempted = false;
+      try {
+        gpsAttempted = sessionStorage.getItem('cyl_search_gps_try') === '1';
+      } catch {
+        /* ignore */
+      }
+
+      if (!gpsAttempted && navigator.geolocation && window.isSecureContext) {
+        try {
+          try {
+            sessionStorage.setItem('cyl_search_gps_try', '1');
+          } catch {
+            /* ignore */
+          }
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 12000,
+              maximumAge: 300000,
+            });
+          });
+          const { data } = await api.get('/items/reverse-geocode', {
+            params: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          });
+          nextCountry = data?.country != null ? String(data.country).trim() : '';
+          nextCity = data?.city != null ? String(data.city).trim() : '';
+        } catch {
+          /* fall through to prefs / browse country */
+        }
+      }
+
+      const prefs = readLocationPrefs();
+      if (!nextCountry) {
+        nextCountry = prefs.country || String(browseCountry || '').trim();
+      }
+      if (!nextCity) {
+        nextCity = prefs.city;
+      }
+
+      if (cancelled) return;
+      if (nextCountry || nextCity) {
+        writeLocationPrefs(nextCountry, nextCity);
+        setParams((prev) => {
+          const next = new URLSearchParams(prev);
+          if (nextCountry) next.set('country', nextCountry);
+          if (nextCity) next.set('city', nextCity);
+          return next;
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [browseCountry, country, city, setParams]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -140,7 +244,7 @@ export function Search() {
             params: {
               lat: geo.lat,
               lng: geo.lng,
-              km: 25,
+              km: nearKm,
               ...baseParams,
             },
           });
@@ -171,7 +275,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [baseParams, nearbyMode, geo]);
+  }, [baseParams, nearbyMode, geo, nearKm]);
 
   function updateParam(key, value) {
     const next = new URLSearchParams(params);
@@ -181,6 +285,21 @@ export function Search() {
       next.set(key, value);
     }
     setParams(next);
+    if (key === 'country' || key === 'city') {
+      const nextC =
+        key === 'country'
+          ? value === '' || value === 'all'
+            ? ''
+            : String(value)
+          : country === 'all'
+            ? ''
+            : country;
+      const nextCityVal =
+        key === 'city'
+          ? String(value || '').trim()
+          : String(city || '').trim();
+      writeLocationPrefs(nextC, nextCityVal);
+    }
   }
 
   function setSearchCategory(cat) {
@@ -227,9 +346,39 @@ export function Search() {
     setNearbyFallback(false);
   }
 
+  const categorySummary =
+    category === 'all' || !params.get('category')
+      ? 'All categories'
+      : `${MAIN_CATEGORIES.find((c) => c.id === category)?.shortLabel || category}${
+          subcategory !== 'all' && params.get('subcategory') ? ` · ${subcategory}` : ''
+        }`;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Search</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-slate-900">Search</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-500">Type</span>
+          {[
+            { value: '', label: 'All' },
+            { value: 'lost', label: 'Lost' },
+            { value: 'found', label: 'Found' },
+          ].map((t) => (
+            <button
+              key={t.label}
+              type="button"
+              onClick={() => updateParam('type', t.value)}
+              className={`px-4 py-2 rounded-full text-sm font-medium border ${
+                type === t.value
+                  ? 'bg-brand-blue text-white border-brand-blue'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex gap-2 shadow-sm rounded-2xl border border-slate-200 bg-white p-1.5">
@@ -260,146 +409,172 @@ export function Search() {
                 : 'bg-white border-slate-200 text-slate-800 hover:border-brand-blue'
             }`}
           >
-            {geoLoading ? 'Locating…' : nearbyMode ? '✓ Nearby (25 km) — tap to clear' : '📍 Near me (25 km)'}
+            {geoLoading
+              ? 'Locating…'
+              : nearbyMode
+                ? `✓ Nearby (${nearKm} km) — tap to clear`
+                : '📍 Near me (25 km)'}
+          </button>
+          <div className="flex items-center gap-2 min-w-[220px]">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={nearKm}
+              onChange={(e) => setNearKm(Number(e.target.value))}
+              className="w-40 accent-brand-blue"
+              aria-label="Nearby distance in km"
+            />
+            <span className="text-xs text-slate-600 w-16 text-right">{nearKm} km</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAdvOpen((o) => !o)}
+            className="ml-auto sm:ml-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border border-slate-200 bg-white text-slate-800 hover:border-brand-blue"
+            aria-expanded={advOpen}
+          >
+            Adv Option
+            <span className="text-slate-400" aria-hidden>
+              {advOpen ? '▾' : '▸'}
+            </span>
           </button>
           {nearbyMode && (
-            <span className="text-xs text-slate-600 max-w-xl">
-              Shows listings with a map pin within 25 km when available. If none have GPS, results match your other
+            <span className="text-xs text-slate-600 w-full sm:w-auto max-w-xl">
+              Shows listings with a map pin within {nearKm} km when available. If none have GPS, results match your other
               filters (same as a normal search).
             </span>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-slate-500 w-full sm:w-auto py-1">Type</span>
-          {[
-            { value: '', label: 'All' },
-            { value: 'lost', label: 'Lost' },
-            { value: 'found', label: 'Found' },
-          ].map((t) => (
-            <button
-              key={t.label}
-              type="button"
-              onClick={() => updateParam('type', t.value)}
-              className={`px-4 py-2 rounded-full text-sm font-medium border ${
-                type === t.value
-                  ? 'bg-brand-blue text-white border-brand-blue'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-start">
-          <span className="text-sm text-slate-500 w-full py-1">Country</span>
-          <select
-            value={country}
-            onChange={(e) => updateParam('country', e.target.value === 'all' ? '' : e.target.value)}
-            className="w-full sm:w-auto min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
-          >
-            <option value="all">All countries</option>
-            {countryList.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="search-city" className="block text-xs font-medium text-slate-600 mb-1">
-              City
-            </label>
-            <input
-              id="search-city"
-              type="text"
-              list="search-city-options"
-              value={city}
-              onChange={(e) => updateParam('city', e.target.value.trim())}
-              placeholder="Filter by city (optional)"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
-            />
-            <datalist id="search-city-options">
-              {cityList.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <label htmlFor="search-county" className="block text-xs font-medium text-slate-600 mb-1">
-              County / district
-            </label>
-            <input
-              id="search-county"
-              type="text"
-              list="search-county-options"
-              value={county}
-              onChange={(e) => updateParam('county', e.target.value.trim())}
-              placeholder="Filter by county or district (optional)"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
-            />
-            <datalist id="search-county-options">
-              {countyList.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <span className="text-sm text-slate-500 block py-1">Category</span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchCategory('all')}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
-                category === 'all' || !params.get('category')
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-700 border-slate-200'
-              }`}
-            >
-              All
-            </button>
-            {MAIN_CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSearchCategory(c.id)}
-                title={c.label}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border max-w-[10rem] truncate ${
-                  category === c.id
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-700 border-slate-200'
-                }`}
-              >
-                <span className="mr-1" aria-hidden>
-                  {c.icon}
-                </span>
-                {c.shortLabel}
-              </button>
-            ))}
-          </div>
-          {mainMeta?.subs?.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <label htmlFor="subcat" className="text-xs text-slate-500">
-                Sub-type
-              </label>
+        {advOpen && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-4">
+            <div className="flex flex-wrap gap-2 items-start">
+              <span className="text-sm text-slate-500 w-full py-1">Country</span>
               <select
-                id="subcat"
-                value={subcategory === 'all' || !params.get('subcategory') ? 'all' : subcategory}
-                onChange={(e) => updateParam('subcategory', e.target.value === 'all' ? '' : e.target.value)}
-                className="flex-1 min-w-[180px] max-w-md rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                value={country}
+                onChange={(e) => updateParam('country', e.target.value === 'all' ? '' : e.target.value)}
+                className="w-full sm:w-auto min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
               >
-                <option value="all">All sub-types</option>
-                {mainMeta.subs.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
+                <option value="all">All countries</option>
+                {countryList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="search-city" className="block text-xs font-medium text-slate-600 mb-1">
+                  City
+                </label>
+                <input
+                  id="search-city"
+                  type="text"
+                  list="search-city-options"
+                  value={city}
+                  onChange={(e) => updateParam('city', e.target.value.trim())}
+                  placeholder="Filter by city (optional)"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                />
+                <datalist id="search-city-options">
+                  {cityList.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label htmlFor="search-county" className="block text-xs font-medium text-slate-600 mb-1">
+                  County / district
+                </label>
+                <input
+                  id="search-county"
+                  type="text"
+                  list="search-county-options"
+                  value={county}
+                  onChange={(e) => updateParam('county', e.target.value.trim())}
+                  placeholder="Filter by county or district (optional)"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                />
+                <datalist id="search-county-options">
+                  {countyList.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setCategoryOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            aria-expanded={categoryOpen}
+          >
+            <span>
+              Category <span className="font-normal text-slate-500">({categorySummary})</span>
+            </span>
+            <span className="text-slate-400 shrink-0" aria-hidden>
+              {categoryOpen ? '▾' : '▸'}
+            </span>
+          </button>
+          {categoryOpen && (
+            <div className="px-4 pb-4 pt-0 space-y-2 border-t border-slate-100">
+              <div className="flex flex-wrap gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setSearchCategory('all')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
+                    category === 'all' || !params.get('category')
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-700 border-slate-200'
+                  }`}
+                >
+                  All
+                </button>
+                {MAIN_CATEGORIES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSearchCategory(c.id)}
+                    title={c.label}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border max-w-[10rem] truncate ${
+                      category === c.id
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <span className="mr-1" aria-hidden>
+                      {c.icon}
+                    </span>
+                    {c.shortLabel}
+                  </button>
+                ))}
+              </div>
+              {mainMeta?.subs?.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <label htmlFor="subcat" className="text-xs text-slate-500">
+                    Sub-type
+                  </label>
+                  <select
+                    id="subcat"
+                    value={subcategory === 'all' || !params.get('subcategory') ? 'all' : subcategory}
+                    onChange={(e) => updateParam('subcategory', e.target.value === 'all' ? '' : e.target.value)}
+                    className="flex-1 min-w-[180px] max-w-md rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="all">All sub-types</option>
+                    {mainMeta.subs.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -438,7 +613,7 @@ export function Search() {
 
       {nearbyFallback && !error && (
         <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-          No open listings with a map location within 25 km for these filters. Showing all listings that match your
+          No open listings with a map location within {nearKm} km for these filters. Showing all listings that match your
           filters (including posts without GPS).
         </p>
       )}

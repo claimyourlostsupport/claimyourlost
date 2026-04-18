@@ -124,6 +124,12 @@ export function ItemDetail() {
   }
 
   const isFound = item.type === 'found';
+  /** Found + claimant already has chat CTA inside "Your claim"; skip duplicate top button */
+  const showTopOpenChat =
+    isAuthenticated &&
+    (item.type === 'lost' || isOwner || hasClaim) &&
+    !(isFound && !isOwner && hasClaim);
+  const showLostLoginCta = item.type === 'lost' && !isAuthenticated;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -218,68 +224,80 @@ export function ItemDetail() {
 
       <ShareListing itemId={id} title={item.title} type={item.type} location={item.location} country={item.country} />
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        {isAuthenticated && (item.type === 'lost' || isOwner || hasClaim) && (
-          <Link
-            to={`/items/${id}/chat`}
-            className="flex-1 text-center py-3.5 rounded-xl border-2 border-brand-blue text-brand-blue font-semibold hover:bg-blue-50"
-          >
-            Open chat
-          </Link>
-        )}
-        {item.type === 'lost' && !isAuthenticated && (
-          <Link
-            to="/login"
-            state={{ from: { pathname: `/items/${id}/chat` } }}
-            className="flex-1 text-center py-3.5 rounded-xl border-2 border-brand-blue text-brand-blue font-semibold hover:bg-blue-50"
-          >
-            Log in to chat
-          </Link>
-        )}
-        {isFound && !isOwner && (
-          <button
-            type="button"
-            onClick={() => document.getElementById('claim-section')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex-1 py-3.5 rounded-xl bg-brand-green text-white font-semibold hover:bg-emerald-700"
-          >
-            Claim this item
-          </button>
-        )}
-      </div>
-
-      {isFound && !isOwner && (
-        <section id="claim-section" className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-          <h2 className="font-bold text-slate-900">Claim verification</h2>
-          <p className="text-sm text-slate-600">
-            Describe unique details only the owner would know (scratches, contents, lock screen).
-          </p>
-          {!isAuthenticated ? (
+      {(showTopOpenChat || showLostLoginCta) && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          {showTopOpenChat && (
+            <Link
+              to={`/items/${id}/chat`}
+              className="flex-1 text-center py-3.5 rounded-xl border-2 border-brand-blue text-brand-blue font-semibold hover:bg-blue-50"
+            >
+              Open chat
+            </Link>
+          )}
+          {showLostLoginCta && (
             <Link
               to="/login"
-              state={{ from: { pathname: `/items/${id}` } }}
-              className="inline-flex px-5 py-3 rounded-xl bg-brand-blue text-white font-semibold"
+              state={{ from: { pathname: `/items/${id}/chat` } }}
+              className="flex-1 text-center py-3.5 rounded-xl border-2 border-brand-blue text-brand-blue font-semibold hover:bg-blue-50"
             >
-              Log in to claim
+              Log in to chat
             </Link>
-          ) : (
-            <form onSubmit={submitClaim} className="space-y-3">
-              <textarea
-                required
-                value={claimMsg}
-                onChange={(e) => setClaimMsg(e.target.value)}
-                rows={4}
-                placeholder="e.g. Brown leather, ID card name ends with …, scratch near corner"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-blue/30"
-              />
-              {claimError && <p className="text-sm text-red-600">{claimError}</p>}
-              <button
-                type="submit"
-                disabled={claimLoading}
-                className="w-full py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-60"
+          )}
+        </div>
+      )}
+
+      {isFound && !isOwner && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <h2 className="font-bold text-slate-900">{hasClaim ? 'Your claim' : 'Claim this item'}</h2>
+          {hasClaim ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 space-y-2">
+              <p className="font-medium">You already submitted a claim for this item.</p>
+              <p className="text-emerald-900/90">
+                It was sent to the person who found it and is stored on your account. Use chat to follow up — you cannot
+                submit another claim.
+              </p>
+              <Link
+                to={`/items/${id}/chat`}
+                className="inline-flex px-5 py-2.5 rounded-xl bg-brand-blue text-white font-semibold text-sm"
               >
-                {claimLoading ? 'Submitting…' : 'Submit claim'}
-              </button>
-            </form>
+                Open chat
+              </Link>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600">
+                Describe unique details only the owner would know (scratches, contents, lock screen). You can only
+                submit once; your message is shared with the finder and saved.
+              </p>
+              {!isAuthenticated ? (
+                <Link
+                  to="/login"
+                  state={{ from: { pathname: `/items/${id}` } }}
+                  className="inline-flex px-5 py-3 rounded-xl bg-brand-blue text-white font-semibold"
+                >
+                  Log in to claim
+                </Link>
+              ) : (
+                <form onSubmit={submitClaim} className="space-y-3">
+                  <textarea
+                    required
+                    value={claimMsg}
+                    onChange={(e) => setClaimMsg(e.target.value)}
+                    rows={4}
+                    placeholder="e.g. Brown leather, ID card name ends with …, scratch near corner"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-blue/30"
+                  />
+                  {claimError && <p className="text-sm text-red-600">{claimError}</p>}
+                  <button
+                    type="submit"
+                    disabled={claimLoading}
+                    className="w-full py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {claimLoading ? 'Submitting…' : 'Submit claim'}
+                  </button>
+                </form>
+              )}
+            </>
           )}
         </section>
       )}

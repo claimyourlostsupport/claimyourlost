@@ -4,9 +4,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useBrowseScope } from '../context/BrowseScopeContext.jsx';
 import { api } from '../api/client.js';
 import { mergeCountryOptions } from '../constants/countries.js';
-import { paypalSupportUrl } from '../constants/support.js';
+import { paypalSupportUrl, SUPPORT_EMAIL } from '../constants/support.js';
 import { NotificationBell } from './NotificationBell.jsx';
-import { SupportBlock } from './SupportBlock.jsx';
 
 const navClass = ({ isActive }) =>
   `flex flex-col items-center gap-0.5 px-1.5 sm:px-3 py-2 text-[10px] sm:text-xs font-medium rounded-xl transition-colors min-w-0 flex-1 ${
@@ -105,13 +104,22 @@ function HeaderBrowseMenu() {
       </button>
       {menuOpen && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 min-w-[11rem] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[13.5rem] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           role="menu"
         >
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            role="menuitem"
+            className="block px-3 py-2.5 text-sm hover:bg-slate-50"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span className="block font-medium text-slate-800">Contact us</span>
+            <span className="block text-xs text-slate-500 truncate mt-0.5">{SUPPORT_EMAIL}</span>
+          </a>
           <button
             type="button"
             role="menuitem"
-            className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            className="w-full text-left px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 border-t border-slate-100"
             onClick={() => {
               setMenuOpen(false);
               setModalOpen(true);
@@ -276,11 +284,8 @@ export function Layout() {
       </nav>
 
       <footer className="border-t border-slate-200 bg-slate-50 mt-auto pb-28 md:pb-8">
-        <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-          <div className="max-w-lg mx-auto">
-            <SupportBlock variant="compact" />
-          </div>
-          <p className="text-center text-sm text-slate-500 border-t border-slate-200 pt-6">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <p className="text-center text-sm text-slate-500">
             ClaimYourLost — Lost it? Claim it back.
           </p>
         </div>

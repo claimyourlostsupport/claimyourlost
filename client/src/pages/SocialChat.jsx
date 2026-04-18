@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const POLL_MS = 4000;
+const SOCIALHUB_CHAT_POLL_MS = 4000;
 
 export function SocialChat() {
   const { id } = useParams();
@@ -54,7 +54,7 @@ export function SocialChat() {
   useEffect(() => {
     if (!isAuthenticated) return undefined;
     loadMessages();
-    const t = setInterval(loadMessages, POLL_MS);
+    const t = setInterval(loadMessages, SOCIALHUB_CHAT_POLL_MS);
     return () => clearInterval(t);
   }, [id, isAuthenticated]);
 
@@ -78,7 +78,7 @@ export function SocialChat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function send(e) {
+  async function sendSocialHubMessage(e) {
     e.preventDefault();
     const t = text.trim();
     if (!t || sendLoading) return;
@@ -105,25 +105,34 @@ export function SocialChat() {
         <Link to="/social-hub" className="text-brand-blue text-sm font-semibold">
           ← SocialHub
         </Link>
-        <h1 className="text-lg font-bold text-slate-900 truncate flex-1">Chat</h1>
+        <h1 className="text-lg font-bold text-slate-900 truncate flex-1">SocialHub chat</h1>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-950">
+        <p className="font-semibold text-amber-900">Safety (SocialHub)</p>
+        <p className="mt-1.5 leading-relaxed">
+          Do not share passwords, OTPs, or full ID numbers in this chat. Meet in safe public places when meeting in
+          person.
+        </p>
       </div>
 
       {post?.mediaUrl && (
-        <div className="flex gap-3 mb-4 p-3 bg-white rounded-xl border border-slate-100">
+        <div className="flex gap-3 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
           {isVideo ? (
             <video
               src={assetUrl(post.mediaUrl)}
-              className="w-24 h-24 object-cover rounded-lg bg-black shrink-0"
+              className="h-20 w-20 shrink-0 object-cover rounded-lg bg-black"
               muted
               playsInline
             />
           ) : (
-            <img src={assetUrl(post.mediaUrl)} alt="" className="w-24 h-24 object-cover rounded-lg shrink-0" />
+            <img
+              src={assetUrl(post.mediaUrl)}
+              alt=""
+              className="h-20 w-20 shrink-0 object-cover rounded-lg bg-white border border-slate-100"
+            />
           )}
-          <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2 self-center">
-            Safety: do not share passwords, OTPs, or full ID numbers. Meet in safe public places when meeting in
-            person.
-          </p>
+          <p className="text-xs text-slate-600 self-center">Preview of the post you are discussing.</p>
         </div>
       )}
 
@@ -168,7 +177,7 @@ export function SocialChat() {
       </div>
 
       <form
-        onSubmit={send}
+        onSubmit={sendSocialHubMessage}
         className="sticky bottom-0 pt-2 pb-1 bg-slate-50 -mx-4 px-4 border-t border-slate-200 md:static md:border-0 md:bg-transparent md:px-0"
       >
         <div className="flex gap-2">

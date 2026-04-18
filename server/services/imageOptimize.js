@@ -12,26 +12,41 @@ function jpegOptions(useMozjpeg) {
     : { quality: JPEG_QUALITY, mozjpeg: false };
 }
 
-async function toJpegBuffer(input, useMozjpeg) {
+function resolveMaxEdge(options = {}) {
+  const requested = Number(options?.maxEdge);
+  if (!Number.isFinite(requested)) return MAX_EDGE;
+  return Math.min(2000, Math.max(1, Math.round(requested)));
+}
+
+function resolveResizeBox(options = {}) {
+  const edge = resolveMaxEdge(options);
+  const maxWidthNum = Number(options?.maxWidth);
+  const maxHeightNum = Number(options?.maxHeight);
+  const maxWidth = Number.isFinite(maxWidthNum) ? Math.min(2000, Math.max(1, Math.round(maxWidthNum))) : edge;
+  const maxHeight = Number.isFinite(maxHeightNum) ? Math.min(2000, Math.max(1, Math.round(maxHeightNum))) : edge;
+  return { maxWidth, maxHeight };
+}
+
+async function toJpegBuffer(input, useMozjpeg, resizeBox) {
   return sharp(input, { failOn: 'none' })
     .rotate()
-    .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+    .resize(resizeBox.maxWidth, resizeBox.maxHeight, { fit: 'inside', withoutEnlargement: true })
     .jpeg(jpegOptions(useMozjpeg))
     .toBuffer();
 }
 
 /** Re-encode with same resize as main path — survives some Windows/Sharp edge cases. */
-async function sharpReencodeRotate(input) {
+async function sharpReencodeRotate(input, resizeBox) {
   return sharp(input, { failOn: 'none' })
     .rotate()
-    .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+    .resize(resizeBox.maxWidth, resizeBox.maxHeight, { fit: 'inside', withoutEnlargement: true })
     .jpeg(jpegOptions(false))
     .toBuffer();
 }
 
-async function sharpReencodeRaw(input) {
+async function sharpReencodeRaw(input, resizeBox) {
   return sharp(input, { failOn: 'none' })
-    .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+    .resize(resizeBox.maxWidth, resizeBox.maxHeight, { fit: 'inside', withoutEnlargement: true })
     .jpeg(jpegOptions(false))
     .toBuffer();
 }
@@ -41,12 +56,12 @@ function isLikelyJpeg(buf) {
 }
 
 /** Pure-JS decoder; used when Sharp/libvips fails (common on some Windows + exotic formats). */
-async function jimpToJpeg(buf) {
+async function jimpToJpeg(buf, resizeBox) {
   const { Jimp } = await import('jimp');
   const image = await Jimp.read(buf);
   const w = image.width;
   const h = image.height;
-  const scale = Math.min(MAX_EDGE / w, MAX_EDGE / h, 1);
+  const scale = Math.min(resizeBox.maxWidth / w, resizeBox.maxHeight / h, 1);
   if (scale < 1) {
     image.resize({ width: Math.round(w * scale), height: Math.round(h * scale) });
   }
@@ -82,10 +97,11 @@ async function writeJpegAtomically(dir, base, buffer, originalPath) {
  * Resize (fit inside square) and re-encode as JPEG to save disk space.
  * Returns the final filename (always .jpg).
  */
-export async function optimizeUploadedImage(filePath) {
+export async function optimizeUploadedImage(filePath, options = {}) {
   const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
   const base = path.basename(filePath, ext);
+  const resizeBox = resolveResizeBox(options);
 
   const raw = await fs.readFile(filePath);
   if (!raw.length) {
@@ -93,14 +109,14 @@ export async function optimizeUploadedImage(filePath) {
   }
 
   const attempts = [
-    () => toJpegBuffer(filePath, true),
-    () => toJpegBuffer(filePath, false),
-    () => toJpegBuffer(raw, true),
-    () => toJpegBuffer(raw, false),
-    () => sharpReencodeRotate(raw),
-    () => sharpReencodeRotate(filePath),
-    () => sharpReencodeRaw(raw),
-    () => jimpToJpeg(raw),
+    () => toJpegBuffer(filePath, true, resizeBox),
+    () => toJpegBuffer(filePath, false, resizeBox),
+    () => toJpegBuffer(raw, true, resizeBox),
+    () => toJpegBuffer(raw, false, resizeBox),
+    () => sharpReencodeRotate(raw, resizeBox),
+    () => sharpReencodeRotate(filePath, resizeBox),
+    () => sharpReencodeRaw(raw, resizeBox),
+    () => jimpToJpeg(raw, resizeBox),
   ];
 
   let buffer;
@@ -118,7 +134,7 @@ export async function optimizeUploadedImage(filePath) {
   if (!buffer && isLikelyJpeg(raw) && raw.length <= 5 * 1024 * 1024) {
     try {
       buffer = await sharp(raw, { failOn: 'none' })
-        .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+        .resize(resizeBox.maxWidth, resizeBox.maxHeight, { fit: 'inside', withoutEnlargement: true })
         .jpeg(jpegOptions(false))
         .toBuffer();
     } catch {

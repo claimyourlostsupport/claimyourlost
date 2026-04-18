@@ -74,6 +74,9 @@ async function notifySocialMessageRecipients(post, senderId, textPreview) {
 
 const router = Router();
 
+const CLAIM_REQUIRED_MSG =
+  'This listing is marked as Found. Submit a one-time claim explaining why this item is yours. After the finder receives it, you can use chat.';
+
 async function canAccessItemMessages(userId, itemId) {
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, reason: 'not_found' };
@@ -81,6 +84,7 @@ async function canAccessItemMessages(userId, itemId) {
   if (item.type === 'lost') return { ok: true, item };
   const hasClaim = await Claim.exists({ itemId, userId });
   if (hasClaim) return { ok: true, item };
+  if (item.type === 'found') return { ok: false, reason: 'need_claim', item };
   return { ok: false, reason: 'forbidden' };
 }
 
@@ -132,8 +136,14 @@ router.post('/', requireAuth, async (req, res) => {
         if (access.reason === 'not_found') {
           return res.status(404).json({ error: 'Item not found' });
         }
+        if (access.reason === 'need_claim') {
+          return res.status(403).json({
+            error: CLAIM_REQUIRED_MSG,
+            code: 'CLAIM_REQUIRED',
+          });
+        }
         return res.status(403).json({
-          error: 'You can only message about items you posted or claimed',
+          error: 'You cannot open this chat.',
         });
       }
 
@@ -192,7 +202,13 @@ router.get('/:itemId', requireAuth, async (req, res) => {
       if (access.reason === 'not_found') {
         return res.status(404).json({ error: 'Item not found' });
       }
-      return res.status(403).json({ error: 'Not allowed' });
+      if (access.reason === 'need_claim') {
+        return res.status(403).json({
+          error: CLAIM_REQUIRED_MSG,
+          code: 'CLAIM_REQUIRED',
+        });
+      }
+      return res.status(403).json({ error: 'You cannot open this chat.' });
     }
 
     const messages = await Message.find({ itemId: req.params.itemId })

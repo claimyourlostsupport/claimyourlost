@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { Claim } from '../models/Claim.js';
 import { Item } from '../models/Item.js';
+import { Message } from '../models/Message.js';
+import { Notification } from '../models/Notification.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -47,19 +49,43 @@ router.post('/', requireAuth, async (req, res) => {
 
     const existing = await Claim.findOne({ itemId, userId: req.userId });
     if (existing) {
-      existing.message = String(message).trim();
-      await existing.save();
-      const populated = await Claim.findById(existing._id)
-        .populate('userId', 'phone')
-        .populate('itemId');
-      return res.json(populated);
+      return res.status(409).json({
+        error: 'You already submitted a claim for this item. Open chat to continue the conversation.',
+      });
     }
 
+    const trimmed = String(message).trim();
     const claim = await Claim.create({
       itemId,
       userId: req.userId,
-      message: String(message).trim(),
+      message: trimmed,
     });
+
+    const chatLine = `Claim: ${trimmed}`;
+    try {
+      await Message.create({
+        itemId,
+        socialPostId: null,
+        senderId: req.userId,
+        text: chatLine.slice(0, 5000),
+      });
+    } catch (e) {
+      console.error('claim chat seed message', e);
+    }
+
+    try {
+      const itemTitle = String(item.title || 'Listing').slice(0, 60);
+      await Notification.create({
+        userId: item.userId,
+        type: 'message',
+        title: 'New claim',
+        body: `Someone claimed “${itemTitle}”: ${trimmed.slice(0, 140)}${trimmed.length > 140 ? '…' : ''}`,
+        relatedItemId: item._id,
+        read: false,
+      });
+    } catch (e) {
+      console.error('claim owner notification', e);
+    }
 
     const populated = await Claim.findById(claim._id)
       .populate('userId', 'phone')

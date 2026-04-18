@@ -10,6 +10,8 @@ const socialPostSchema = new mongoose.Schema(
     description: { type: String, default: '', trim: true },
     city: { type: String, default: '', trim: true },
     country: { type: String, default: '', trim: true },
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
     mediaUrl: { type: String, required: true, trim: true },
     mediaType: {
       type: String,
