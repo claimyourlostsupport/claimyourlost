@@ -1,48 +1,50 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
-import {
-  listingImagePlaceholderClass,
-} from '../constants/images.js';
-import { formatItemCategory } from '../constants/categories.js';
-import { formatCalendarDate, formatDateTimeLocal } from '../utils/dateDisplay.js';
+import { formatDateTimeLocal } from '../utils/dateDisplay.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
-export function ItemCard({ item }) {
+function maskPhone(phone) {
+  const s = phone != null ? String(phone).trim() : '';
+  if (!s) return 'Member';
+  if (s.length <= 4) return `••••${s}`;
+  return `••••${s.slice(-4)}`;
+}
+
+export function SocialPostCard({ post }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const { user, isAuthenticated } = useAuth();
-  const initialReaction = (item.reactions || []).find((r) => String(r.userId) === String(user?.id))?.value || '';
+  const initialReaction = (post.reactions || []).find((r) => String(r.userId) === String(user?.id))?.value || '';
   const [vote, setVote] = useState(initialReaction);
-  const [likesCount, setLikesCount] = useState(Number(item.likesCount || 0));
-  const [dislikesCount, setDislikesCount] = useState(Number(item.dislikesCount || 0));
+  const [likesCount, setLikesCount] = useState(Number(post.likesCount || 0));
+  const [dislikesCount, setDislikesCount] = useState(Number(post.dislikesCount || 0));
   const [reactLoading, setReactLoading] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const isFound = item.type === 'found';
-  const city =
-    item?.city?.trim?.() || item?.location?.trim?.() || '';
-  const country =
-    item?.country != null && String(item.country).trim() ? String(item.country).trim() : '';
-  const description = String(item?.description || '').trim();
-  const subcategory = String(item?.subcategory || '').trim().toLowerCase();
-  const customSubType = String(item?.subcategoryCustom || '').trim();
-  const categoryLine =
-    subcategory === 'other'
-      ? customSubType || ''
-      : formatItemCategory(item).replace(/\s*·\s*Other$/i, '');
-  const showSeeMore = description.length > 70;
+
+  const city = String(post?.city || '').trim();
+  const country = String(post?.country || '').trim();
+  const description = String(post?.description || '').trim();
+  const posterLabel = maskPhone(post?.userId?.phone);
+  const dateLine = post?.createdAt ? formatDateTimeLocal(post.createdAt) : '';
+  const metaParts = [dateLine, city || null, country || null].filter(Boolean);
+  const metaLine = metaParts.join(' · ');
+  const needsDescMore = description.length > 100;
+
   const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-  const listingUrl = `${siteBase.replace(/\/$/, '')}/items/${item._id}`;
-  const shareText = `${isFound ? 'Found' : 'Lost'}: ${item.title}\n${listingUrl}`;
+  const sharePageUrl = `${siteBase.replace(/\/$/, '')}/social-hub`;
+  const shareText = `SocialHub on ClaimYourLost\n${sharePageUrl}\n${description ? description.slice(0, 120) + (description.length > 120 ? '…' : '') : 'New post'}`;
+
+  const isVideo = post.mediaType === 'video';
 
   async function toggleVote() {
     if (!isAuthenticated || reactLoading) return;
     const next = vote === '' ? 'like' : vote === 'like' ? 'dislike' : '';
     setReactLoading(true);
     try {
-      const { data } = await api.post(`/items/${item._id}/react`, { value: next });
+      const { data } = await api.post(`/social-posts/${post._id}/react`, { value: next });
       setVote(data.userReaction || '');
       setLikesCount(Number(data.likesCount || 0));
       setDislikesCount(Number(data.dislikesCount || 0));
@@ -58,12 +60,12 @@ export function ItemCard({ item }) {
     window.open(wa, '_blank', 'noopener,noreferrer');
   }
 
-  function reportItem() {
+  function reportPost() {
     setOverflowOpen(false);
     window.alert('Flagged for review.');
   }
 
-  function hideItem() {
+  function hidePost() {
     setOverflowOpen(false);
     setHidden(true);
   }
@@ -72,17 +74,17 @@ export function ItemCard({ item }) {
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(listingUrl);
+      await navigator.clipboard.writeText(sharePageUrl);
       setShareOpen(false);
     } catch {
-      window.prompt('Copy listing link:', listingUrl);
+      window.prompt('Copy link:', sharePageUrl);
     }
   }
 
   function openShare(kind) {
-    const encodedUrl = encodeURIComponent(listingUrl);
+    const encodedUrl = encodeURIComponent(sharePageUrl);
     const encodedText = encodeURIComponent(shareText);
-    const encodedTitle = encodeURIComponent(item.title || 'ClaimYourLost');
+    const encodedTitle = encodeURIComponent('ClaimYourLost SocialHub');
     let url = '';
     switch (kind) {
       case 'facebook':
@@ -98,7 +100,6 @@ export function ItemCard({ item }) {
         url = `mailto:?subject=${encodedTitle}&body=${encodedText}`;
         break;
       case 'instagram':
-        // Instagram web does not support direct URL share intents; open app/site and let user paste.
         window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
         copyLink();
         return;
@@ -110,12 +111,12 @@ export function ItemCard({ item }) {
   }
 
   return (
-    <article className="relative bg-white rounded-2xl shadow-sm border border-slate-100 p-3 min-h-[240px] hover:shadow-md transition-shadow">
+    <article className="relative bg-white rounded-2xl shadow-sm border border-slate-100 p-4 min-h-[320px] flex flex-col hover:shadow-md transition-shadow">
       <button
         type="button"
         onClick={() => setOverflowOpen((x) => !x)}
         title="More"
-        className="absolute top-1.5 right-[-4px] z-20 p-1 text-slate-700"
+        className="absolute top-2 right-[-2px] z-20 p-1 text-slate-700"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
           <circle cx="12" cy="5" r="1.8" fill="currentColor" />
@@ -124,20 +125,23 @@ export function ItemCard({ item }) {
         </svg>
       </button>
       {overflowOpen && (
-        <div className="absolute top-8 right-1.5 z-30 w-44 rounded-xl border border-slate-200 bg-white shadow-xl p-1.5">
+        <div className="absolute top-9 right-1.5 z-30 w-44 rounded-xl border border-slate-200 bg-white shadow-xl p-1.5">
           <button
             type="button"
-            onClick={reportItem}
+            onClick={reportPost}
             className="w-full flex items-center gap-2 text-left px-2.5 py-2 text-sm rounded-lg hover:bg-slate-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-700" aria-hidden>
-              <path fill="currentColor" d="M6 3a1 1 0 1 1 2 0v1h8.2c1.52 0 2.47 1.65 1.7 2.95l-1.48 2.5a1 1 0 0 0 0 1.1l1.48 2.5c.77 1.3-.18 2.95-1.7 2.95H8v4a1 1 0 1 1-2 0V3Zm2 3v8h8.2l-1.48-2.5a3 3 0 0 1 0-3.1L16.2 6H8Z" />
+              <path
+                fill="currentColor"
+                d="M6 3a1 1 0 1 1 2 0v1h8.2c1.52 0 2.47 1.65 1.7 2.95l-1.48 2.5a1 1 0 0 0 0 1.1l1.48 2.5c.77 1.3-.18 2.95-1.7 2.95H8v4a1 1 0 1 1-2 0V3Zm2 3v8h8.2l-1.48-2.5a3 3 0 0 1 0-3.1L16.2 6H8Z"
+              />
             </svg>
             <span>Report</span>
           </button>
           <button
             type="button"
-            onClick={hideItem}
+            onClick={hidePost}
             className="w-full flex items-center gap-2 text-left px-2.5 py-2 text-sm rounded-lg hover:bg-slate-50"
           >
             <span aria-hidden>🙈</span>
@@ -145,79 +149,64 @@ export function ItemCard({ item }) {
           </button>
         </div>
       )}
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${
-                isFound ? 'bg-brand-green' : 'bg-brand-red'
+
+      <div className="pr-5 flex flex-col flex-1 min-h-0">
+        <p className="text-xs font-semibold text-slate-800 mb-1">
+          <span className="text-slate-500 font-medium">Posted by</span> {posterLabel}
+        </p>
+        <p className="text-[11px] text-slate-500 truncate mb-2">{metaLine || '—'}</p>
+
+        {description ? (
+          <div className="mb-3">
+            <p
+              className={`text-sm text-slate-700 leading-snug ${
+                descExpanded ? '' : 'line-clamp-2'
               }`}
             >
-              {isFound ? 'FOUND' : 'LOST'}
-            </span>
-            {categoryLine && (
-              <p className="text-[11px] text-slate-500 truncate">
-                {categoryLine}
-              </p>
+              {description}
+            </p>
+            {needsDescMore && (
+              <button
+                type="button"
+                onClick={() => setDescExpanded((x) => !x)}
+                className="mt-0.5 text-xs font-semibold text-brand-blue hover:underline"
+              >
+                {descExpanded ? 'less' : '…more'}
+              </button>
             )}
           </div>
+        ) : (
+          <p className="text-xs text-slate-400 mb-3">No description.</p>
+        )}
 
-          <h3 className="font-semibold text-slate-900 line-clamp-2">{item.title}</h3>
-
-          <p className="text-xs text-slate-600 truncate">📍 {city || 'Not set'}</p>
-
-          <p className="text-xs text-slate-600 truncate">🌍 {country || 'Not set'}</p>
-
-          <p className="text-xs text-slate-400 flex items-center gap-1">
-            <span aria-hidden>📅</span>
-            {item.date
-              ? formatCalendarDate(item.date)
-              : formatDateTimeLocal(item.createdAt)}
-          </p>
-
-          {description ? (
-            <p className={`text-xs text-slate-600 ${descExpanded ? '' : 'line-clamp-1'}`}>
-              {description}
-              {showSeeMore && (
-                <button
-                  type="button"
-                  onClick={() => setDescExpanded((x) => !x)}
-                  className="ml-1 text-brand-blue font-medium hover:underline"
-                >
-                  {descExpanded ? 'see less' : 'see more'}
-                </button>
-              )}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-400">No description.</p>
-          )}
-
-          {item.distanceKm != null && Number.isFinite(item.distanceKm) && (
-            <p className="text-xs font-medium text-brand-blue">
-              📏 {item.distanceKm.toFixed(1)} km away
-            </p>
-          )}
-        </div>
-
-        <div className="relative flex h-[120px] w-[120px] items-center justify-center rounded-xl bg-slate-100 shrink-0 overflow-visible">
-          <div className="h-full w-full rounded-xl overflow-hidden">
-            {item.image ? (
+        <div className="w-full flex-1 min-h-[200px] rounded-xl bg-slate-100 overflow-hidden border border-slate-100">
+          {post.mediaUrl ? (
+            isVideo ? (
+              <video
+                src={assetUrl(post.mediaUrl)}
+                className="w-full h-full max-h-[420px] min-h-[200px] object-contain bg-black"
+                controls
+                playsInline
+              />
+            ) : (
               <button
                 type="button"
                 onClick={() => setPreviewOpen(true)}
-                className="block h-full w-full"
+                className="block w-full h-full min-h-[200px]"
                 title="Open image"
               >
-                <img src={assetUrl(item.image)} alt="" className="h-full w-full object-contain rounded-lg bg-slate-100" />
+                <img
+                  src={assetUrl(post.mediaUrl)}
+                  alt=""
+                  className="w-full max-h-[420px] min-h-[200px] object-contain bg-slate-100"
+                />
               </button>
-            ) : (
-              <div className={listingImagePlaceholderClass}>📦</div>
-            )}
-          </div>
+            )
+          ) : null}
         </div>
       </div>
 
-      {previewOpen && item.image && (
+      {previewOpen && post.mediaUrl && !isVideo && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
           onClick={() => setPreviewOpen(false)}
@@ -231,7 +220,7 @@ export function ItemCard({ item }) {
               Close ✕
             </button>
             <img
-              src={assetUrl(item.image)}
+              src={assetUrl(post.mediaUrl)}
               alt=""
               className="w-full max-h-[80vh] object-contain rounded-xl bg-white"
               onClick={(e) => e.stopPropagation()}
@@ -240,15 +229,8 @@ export function ItemCard({ item }) {
         </div>
       )}
 
-      <div className="mt-2 flex items-center gap-2.5">
-        <Link
-          to={`/items/${item._id}`}
-          className="inline-flex items-center whitespace-nowrap px-3 py-1.5 rounded-lg bg-white border border-slate-300 shadow-sm text-slate-800 text-xs font-semibold leading-none hover:bg-slate-50 transition-colors shrink-0"
-        >
-          View details
-        </Link>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 text-base flex-nowrap ml-1 min-w-0">
+      <div className="mt-4 flex items-center justify-end">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-base flex-nowrap justify-end">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-1.5 py-0.5">
             <button
               type="button"
@@ -268,7 +250,7 @@ export function ItemCard({ item }) {
             <span className="text-[11px] text-slate-600 font-medium leading-none">{likesCount}/{dislikesCount}</span>
           </div>
           <Link
-            to={`/items/${item._id}/chat`}
+            to={`/social-hub/${post._id}/chat`}
             title="Chat"
             className="h-8 w-8 rounded-full border border-slate-200 bg-white flex items-center justify-center shrink-0"
           >
@@ -300,13 +282,55 @@ export function ItemCard({ item }) {
             </button>
             {shareOpen && (
               <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white shadow-lg p-1.5">
-                <button type="button" onClick={() => openShare('facebook')} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">Facebook</button>
-                <button type="button" onClick={() => openShare('linkedin')} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">LinkedIn</button>
-                <button type="button" onClick={() => openShare('instagram')} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">Instagram</button>
-                <button type="button" onClick={() => openShare('twitter')} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">Twitter / X</button>
-                <button type="button" onClick={shareWhatsApp} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">WhatsApp</button>
-                <button type="button" onClick={() => openShare('mail')} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">Email</button>
-                <button type="button" onClick={copyLink} className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50">Copy link</button>
+                <button
+                  type="button"
+                  onClick={() => openShare('facebook')}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  Facebook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openShare('linkedin')}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  LinkedIn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openShare('instagram')}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  Instagram
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openShare('twitter')}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  Twitter / X
+                </button>
+                <button
+                  type="button"
+                  onClick={shareWhatsApp}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openShare('mail')}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  Email
+                </button>
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  className="w-full text-left px-2.5 py-1.5 text-xs rounded-lg hover:bg-slate-50"
+                >
+                  Copy link
+                </button>
               </div>
             )}
           </div>

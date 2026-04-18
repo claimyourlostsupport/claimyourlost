@@ -71,4 +71,22 @@ router.post('/read-for-item/:itemId', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/read-for-social/:socialPostId', requireAuth, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      {
+        userId: req.userId,
+        relatedSocialPostId: req.params.socialPostId,
+        type: 'message',
+        read: false,
+      },
+      { read: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
 export default router;

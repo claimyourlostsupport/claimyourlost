@@ -5,7 +5,12 @@ const messageSchema = new mongoose.Schema(
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Item',
-      required: true,
+      default: null,
+    },
+    socialPostId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SocialPost',
+      default: null,
     },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -18,5 +23,6 @@ const messageSchema = new mongoose.Schema(
 );
 
 messageSchema.index({ itemId: 1, createdAt: 1 });
+messageSchema.index({ socialPostId: 1, createdAt: 1 });
 
 export const Message = mongoose.model('Message', messageSchema);

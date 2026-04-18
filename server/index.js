@@ -11,6 +11,7 @@ import claimRoutes from './routes/claims.js';
 import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
+import socialPostRoutes from './routes/socialPosts.js';
 import { isCloudinaryEnabled } from './services/cloudinaryStorage.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +45,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/auth', authRoutes);
 app.use('/items', itemRoutes);
+app.use('/social-posts', socialPostRoutes);
 app.use('/claims', claimRoutes);
 app.use('/messages', messageRoutes);
 app.use('/notifications', notificationRoutes);
@@ -70,7 +72,7 @@ app.get('/', (_req, res) => {
     service: 'claimyourlost-api',
     message: 'API is running. This URL serves JSON only — the public site is hosted elsewhere.',
     health: '/health',
-    routes: ['/auth', '/items', '/claims', '/messages', '/notifications'],
+    routes: ['/auth', '/items', '/social-posts', '/claims', '/messages', '/notifications'],
   });
 });
 

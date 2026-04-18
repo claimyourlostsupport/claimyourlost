@@ -4,7 +4,21 @@ const baseURL = import.meta.env.VITE_API_URL ?? '/api';
 
 export const api = axios.create({
   baseURL,
-  headers: { 'Content-Type': 'application/json' },
+});
+
+/** Default JSON Content-Type breaks multipart uploads (multer never sees the file). */
+api.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  } else if (
+    config.data != null &&
+    typeof config.data === 'object' &&
+    !(config.data instanceof ArrayBuffer) &&
+    !(config.data instanceof Blob)
+  ) {
+    config.headers['Content-Type'] = 'application/json';
+  }
+  return config;
 });
 
 export function setAuthToken(token) {

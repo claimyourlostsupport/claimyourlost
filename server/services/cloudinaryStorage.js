@@ -37,11 +37,34 @@ export async function uploadImageToCloudinary(localFilePath) {
   };
 }
 
+/** Upload image or video (local path) to Cloudinary. */
+export async function uploadMediaToCloudinary(localFilePath, mimetype) {
+  if (!ensureConfigured()) {
+    throw new Error('Cloudinary is not configured');
+  }
+  const isVideo = String(mimetype || '').startsWith('video/');
+  const result = await cloudinary.uploader.upload(localFilePath, {
+    folder: 'claimyourlost/social',
+    resource_type: isVideo ? 'video' : 'image',
+    overwrite: false,
+  });
+  return {
+    secureUrl: String(result.secure_url || ''),
+    publicId: String(result.public_id || ''),
+    resourceType: isVideo ? 'video' : 'image',
+  };
+}
+
 export async function deleteCloudinaryImage(publicId) {
+  return deleteCloudinaryMedia(publicId, 'image');
+}
+
+export async function deleteCloudinaryMedia(publicId, resourceType = 'image') {
   if (!publicId || !ensureConfigured()) return false;
+  const rt = resourceType === 'video' ? 'video' : 'image';
   try {
     const result = await cloudinary.uploader.destroy(String(publicId), {
-      resource_type: 'image',
+      resource_type: rt,
       invalidate: true,
     });
     return result?.result === 'ok' || result?.result === 'not found';

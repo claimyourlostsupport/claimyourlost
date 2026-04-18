@@ -19,6 +19,10 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Item',
     },
+    relatedSocialPostId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SocialPost',
+    },
     matchedItemId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Item',

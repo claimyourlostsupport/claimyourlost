@@ -156,9 +156,7 @@ export function PostItem() {
         form.append('lng', lng);
       }
 
-      const { data } = await api.post('/items', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await api.post('/items', form);
       navigate(`/items/${data._id}`);
     } catch (err) {
       setError(err.response?.data?.error || 'Could not create listing');

@@ -10,12 +10,27 @@ import { Chat } from './pages/Chat.jsx';
 import { Login } from './pages/Login.jsx';
 import { MapView } from './pages/MapView.jsx';
 import { NotFound } from './pages/NotFound.jsx';
+import { EventNews } from './pages/EventNews.jsx';
+import { SocialHub } from './pages/SocialHub.jsx';
+import { Looking } from './pages/Looking.jsx';
+import { SocialChat } from './pages/SocialChat.jsx';
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/events" element={<EventNews />} />
+        <Route
+          path="/social-hub/:id/chat"
+          element={
+            <ProtectedRoute>
+              <SocialChat />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/social-hub" element={<SocialHub />} />
+        <Route path="/looking" element={<Looking />} />
         <Route path="/search" element={<Search />} />
         <Route path="/map" element={<MapView />} />
         <Route path="/items/:id" element={<ItemDetail />} />

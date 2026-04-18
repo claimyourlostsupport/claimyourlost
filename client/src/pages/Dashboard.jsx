@@ -128,7 +128,16 @@ export function Dashboard() {
                     <p className="font-semibold text-slate-900 text-sm">{n.title}</p>
                     <p className="text-sm text-slate-600 mt-1">{n.body}</p>
                     <div className="flex flex-wrap gap-3 mt-3">
-                      {n.type === 'message' && n.relatedItemId && (
+                      {n.type === 'message' && n.relatedSocialPostId && (
+                        <Link
+                          to={`/social-hub/${String(n.relatedSocialPostId)}/chat`}
+                          onClick={() => markRead(n._id)}
+                          className="text-sm font-semibold text-brand-blue hover:underline"
+                        >
+                          Open chat
+                        </Link>
+                      )}
+                      {n.type === 'message' && n.relatedItemId && !n.relatedSocialPostId && (
                         <Link
                           to={`/items/${String(n.relatedItemId)}/chat`}
                           onClick={() => markRead(n._id)}
