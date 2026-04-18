@@ -19,6 +19,25 @@ function isSixDigitPin(s) {
   return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(String(s ?? ''));
 }
 
+function loginSubtitle(step, credentialMode) {
+  if (step === 'phone') {
+    return 'Sign in with your phone. Tap Continue.';
+  }
+  if (step === 'credential' && credentialMode === 'password') {
+    return 'Enter your 6-digit account password.';
+  }
+  if (step === 'credential') {
+    return 'Enter the last 6 digits of your phone number to verify.';
+  }
+  if (step === 'nickname') {
+    return 'This is how others will see you in chats and on listings. You can skip and appear as a masked phone number instead.';
+  }
+  if (step === 'password') {
+    return 'Optional: create a 6-digit numeric PIN (numbers only). Phone sign-in still works. Skip if you prefer — you can set this later from the ⋮ menu.';
+  }
+  return '';
+}
+
 export function Login() {
   const { login, loginWithPassword, requestOtp, updateProfile, setPassword, dismissNewUserPrompt } = useAuth();
   const navigate = useNavigate();
@@ -163,7 +182,7 @@ export function Login() {
     const p = pinDigits(newPassword);
     const c = pinDigits(confirmPassword);
     if (!isSixDigitPin(p)) {
-      setError(`Use exactly ${PIN_LENGTH} digits or tap Skip for now.`);
+      setError('Enter exactly 6 digits (numbers only), or tap Skip for now.');
       return;
     }
     if (p !== c) {
@@ -206,17 +225,7 @@ export function Login() {
                   ? 'Enter your password'
                   : 'Welcome back'}
           </h1>
-          <p className="text-sm text-slate-600">
-            {step === 'phone'
-              ? 'Sign in with your phone. Tap Continue.'
-              : step === 'credential' && credentialMode === 'password'
-                ? 'Enter your 6-digit account password.'
-                : step === 'credential'
-                  ? 'Enter the last 6 digits of your phone number to verify.'
-                  : step === 'nickname'
-                    ? 'This is how others will see you in chats and on listings. You can skip and appear as a masked phone number instead.'
-                    : `Optional for now — phone sign-in still works. Use exactly ${PIN_LENGTH} digits if you continue, or skip and set this later from the menu.`}
-          </p>
+          <p className="text-sm text-slate-600">{loginSubtitle(step, credentialMode)}</p>
         </div>
 
         {step === 'nickname' ? (
@@ -255,9 +264,12 @@ export function Login() {
           </form>
         ) : step === 'password' ? (
           <form onSubmit={handlePasswordSave} className="space-y-4">
+            <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+              Not 8 characters — use exactly <strong>6 numbers</strong> (for example <span className="font-mono">123456</span>).
+            </p>
             <div>
               <label htmlFor="login-new-password" className="block text-sm font-medium text-slate-700 mb-1">
-                Password (6 digits)
+                New password (6 digits)
               </label>
               <input
                 id="login-new-password"
@@ -267,7 +279,8 @@ export function Login() {
                 maxLength={PIN_LENGTH}
                 value={newPassword}
                 onChange={(e) => setNewPassword(pinDigits(e.target.value))}
-                placeholder="••••••"
+                placeholder="6 digits"
+                aria-describedby="login-pin-hint"
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg tracking-[0.35em] text-center font-mono focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
               />
             </div>
@@ -283,10 +296,14 @@ export function Login() {
                 maxLength={PIN_LENGTH}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(pinDigits(e.target.value))}
-                placeholder="••••••"
+                placeholder="6 digits"
+                aria-describedby="login-pin-hint"
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg tracking-[0.35em] text-center font-mono focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
               />
             </div>
+            <p id="login-pin-hint" className="text-[11px] text-slate-500">
+              Numbers only. Same 6 digits in both fields.
+            </p>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
