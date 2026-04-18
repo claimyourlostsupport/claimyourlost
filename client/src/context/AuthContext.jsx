@@ -108,6 +108,17 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const loginWithPassword = useCallback(async (phone, password) => {
+    const { data } = await api.post('/auth/login-password', { phone, password });
+    localStorage.setItem(STORAGE_KEY, data.token);
+    const base = stripForStorage(data.user);
+    localStorage.setItem(USER_KEY, JSON.stringify(base));
+    setToken(data.token);
+    setUser({ ...base, isNewUser: Boolean(data.user.isNewUser) });
+    setAuthToken(data.token);
+    return data;
+  }, []);
+
   const refreshUser = async () => {
     try {
       const { data } = await api.get('/auth/me');
@@ -163,6 +174,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token && user),
       loading,
       login,
+      loginWithPassword,
       logout,
       requestOtp,
       refreshUser,
@@ -170,7 +182,7 @@ export function AuthProvider({ children }) {
       setPassword,
       dismissNewUserPrompt,
     }),
-    [user, token, loading, dismissNewUserPrompt, setPassword]
+    [user, token, loading, dismissNewUserPrompt, setPassword, loginWithPassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

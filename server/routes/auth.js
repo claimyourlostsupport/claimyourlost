@@ -48,6 +48,10 @@ router.post('/login', async (req, res) => {
     if (!user) {
       user = await User.create({ phone: normalized });
       isNewUser = true;
+    } else if (user.passwordHash) {
+      return res.status(400).json({
+        error: 'This account uses a password. Go back and sign in with your password.',
+      });
     }
 
     const secret = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -62,6 +66,50 @@ router.post('/login', async (req, res) => {
         phone: user.phone,
         nickname: user.nickname || '',
         isNewUser,
+        hasPassword: Boolean(user.passwordHash),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/** Password sign-in for accounts that already have a password set. */
+router.post('/login-password', async (req, res) => {
+  try {
+    const { phone, password } = req.body;
+    if (!phone || typeof phone !== 'string' || phone.trim().length < 8) {
+      return res.status(400).json({ error: 'Valid phone number is required' });
+    }
+    if (password == null || typeof password !== 'string' || !String(password).length) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const normalized = normalizePhone(phone);
+    const user = await User.findOne({ phone: normalized });
+    if (!user || !user.passwordHash) {
+      return res.status(400).json({ error: 'Invalid phone or password' });
+    }
+
+    const ok = await bcrypt.compare(String(password), user.passwordHash);
+    if (!ok) {
+      return res.status(400).json({ error: 'Incorrect password' });
+    }
+
+    const secret = process.env.JWT_SECRET || 'dev-secret-change-me';
+    const token = jwt.sign({ userId: user._id.toString(), phone: user.phone }, secret, {
+      expiresIn: '30d',
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        phone: user.phone,
+        nickname: user.nickname || '',
+        isNewUser: false,
+        hasPassword: true,
       },
     });
   } catch (err) {
@@ -81,10 +129,21 @@ router.post('/request-otp', async (req, res) => {
     if (!hintOtp) {
       return res.status(400).json({ error: 'Phone number must contain at least 6 digits' });
     }
+
+    const existing = await User.findOne({ phone: normalized }).select('passwordHash').lean();
+    const credentialMode = existing?.passwordHash ? 'password' : 'otp';
+
     res.json({
-      message: 'Use the last 6 digits of your phone number as OTP.',
+      message:
+        credentialMode === 'password'
+          ? 'Enter your account password.'
+          : 'Use the last 6 digits of your phone number as OTP.',
       mode: 'phone_last6',
-      hint: `Enter last 6 digits of ${normalized}`,
+      credentialMode,
+      hint:
+        credentialMode === 'otp'
+          ? `Enter last 6 digits of ${normalized}`
+          : 'Use the password you set for this account.',
     });
   } catch (err) {
     console.error(err);

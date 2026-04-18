@@ -12,7 +12,7 @@ const LOGIN_DIAL_STORAGE_KEY = 'cyl_login_dial';
 const PASSWORD_MIN = 8;
 
 export function Login() {
-  const { login, requestOtp, updateProfile, setPassword, dismissNewUserPrompt } = useAuth();
+  const { login, loginWithPassword, requestOtp, updateProfile, setPassword, dismissNewUserPrompt } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
@@ -28,6 +28,8 @@ export function Login() {
   });
   const [nationalNumber, setNationalNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [credentialMode, setCredentialMode] = useState('otp');
   const [nickname, setNickname] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -58,8 +60,17 @@ export function Login() {
     setLoading(true);
     try {
       const { data } = await requestOtp(phone);
-      setHint(data.hint || 'Enter the last 6 digits of your full phone number (including country code digits).');
-      setStep('otp');
+      const mode = data.credentialMode === 'password' ? 'password' : 'otp';
+      setCredentialMode(mode);
+      setHint(
+        data.hint ||
+          (mode === 'password'
+            ? 'Use the password you set for this account.'
+            : 'Enter the last 6 digits of your full phone number (including country code digits).')
+      );
+      setOtp('');
+      setLoginPass('');
+      setStep('credential');
     } catch (err) {
       setError(err.response?.data?.error || 'Could not send OTP');
     } finally {
@@ -74,6 +85,30 @@ export function Login() {
     try {
       const phone = buildFullPhone(dialCode, nationalNumber);
       const data = await login(phone, otp.trim());
+      if (data?.user?.isNewUser) {
+        setStep('nickname');
+        setNickname('');
+        return;
+      }
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLoginWithPassword(e) {
+    e.preventDefault();
+    setError('');
+    if (!loginPass) {
+      setError('Enter your password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const phone = buildFullPhone(dialCode, nationalNumber);
+      const data = await loginWithPassword(phone, loginPass);
       if (data?.user?.isNewUser) {
         setStep('nickname');
         setNickname('');
@@ -146,7 +181,7 @@ export function Login() {
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 space-y-6">
-        {step !== 'nickname' && step !== 'password' && (
+        {step === 'credential' && credentialMode === 'otp' && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Temporary login mode: SMS OTP is disabled. Enter the last 6 digits of your full international number
             (country code + mobile) to verify.
@@ -158,16 +193,20 @@ export function Login() {
               ? 'Choose a display name'
               : step === 'password'
                 ? 'Set a password'
-                : 'Welcome back'}
+                : step === 'credential' && credentialMode === 'password'
+                  ? 'Enter your password'
+                  : 'Welcome back'}
           </h1>
           <p className="text-sm text-slate-600">
             {step === 'phone'
-              ? 'Sign in with your phone. Tap Send OTP to continue.'
-              : step === 'otp'
-                ? 'Enter the last 6 digits of your phone number to verify.'
-                : step === 'nickname'
-                  ? 'This is how others will see you in chats and on listings. You can skip and appear as a masked phone number instead.'
-                  : 'Optional for now — phone sign-in still works. Use at least 8 characters if you continue, or skip and set this later from the menu.'}
+              ? 'Sign in with your phone. Tap Continue.'
+              : step === 'credential' && credentialMode === 'password'
+                ? 'Use the password you saved for this account.'
+                : step === 'credential'
+                  ? 'Enter the last 6 digits of your phone number to verify.'
+                  : step === 'nickname'
+                    ? 'This is how others will see you in chats and on listings. You can skip and appear as a masked phone number instead.'
+                    : 'Optional for now — phone sign-in still works. Use at least 8 characters if you continue, or skip and set this later from the menu.'}
           </p>
         </div>
 
@@ -288,7 +327,7 @@ export function Login() {
               </div>
               {fullPhone && (
                 <p className="mt-1.5 text-xs text-slate-500">
-                  Sending code for: <span className="font-mono text-slate-700">{fullPhone}</span>
+                  Using number: <span className="font-mono text-slate-700">{fullPhone}</span>
                 </p>
               )}
             </div>
@@ -298,10 +337,50 @@ export function Login() {
               disabled={loading}
               className="w-full py-3.5 rounded-xl bg-brand-blue text-white font-semibold hover:bg-blue-800 disabled:opacity-60"
             >
-              {loading ? 'Please wait…' : 'Send OTP'}
+              {loading ? 'Please wait…' : 'Continue'}
             </button>
           </form>
-        ) : step === 'otp' ? (
+        ) : step === 'credential' && credentialMode === 'password' ? (
+          <form onSubmit={handleLoginWithPassword} className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Signing in as <strong className="font-mono">{fullPhone || 'your number'}</strong>
+              <button
+                type="button"
+                className="ml-2 text-brand-blue font-medium"
+                onClick={() => {
+                  setStep('phone');
+                  setOtp('');
+                  setLoginPass('');
+                }}
+              >
+                Change
+              </button>
+            </p>
+            {hint && <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{hint}</p>}
+            <div>
+              <label htmlFor="login-account-password" className="block text-sm font-medium text-slate-700 mb-1">
+                Password
+              </label>
+              <input
+                id="login-account-password"
+                type="password"
+                autoComplete="current-password"
+                value={loginPass}
+                onChange={(e) => setLoginPass(e.target.value)}
+                placeholder="Your password"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !loginPass}
+              className="w-full py-3.5 rounded-xl bg-brand-blue text-white font-semibold hover:bg-blue-800 disabled:opacity-60"
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        ) : step === 'credential' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <p className="text-sm text-slate-600">
               Code for <strong className="font-mono">{fullPhone || 'your number'}</strong>
@@ -311,6 +390,7 @@ export function Login() {
                 onClick={() => {
                   setStep('phone');
                   setOtp('');
+                  setLoginPass('');
                 }}
               >
                 Change

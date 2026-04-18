@@ -39,7 +39,9 @@ api.interceptors.response.use(
     const path = String(err.config?.url || '');
     if (status === 401) {
       const isPublicAuth =
-        path.includes('auth/login') || path.includes('auth/request-otp');
+        path.includes('auth/login') ||
+        path.includes('auth/request-otp') ||
+        path.includes('auth/login-password');
       // Only wipe storage when the server rejected a request that actually sent a Bearer token.
       // A 401 with no Authorization header is often a race before axios defaults are applied;
       // clearing cyl_token here caused "logged out on refresh" for valid sessions.
