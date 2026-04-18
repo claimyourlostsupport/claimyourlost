@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useBrowseScope } from '../context/BrowseScopeContext.jsx';
@@ -20,6 +21,13 @@ const sectionTabClass = ({ isActive }) =>
       ? 'text-brand-blue border-brand-blue bg-blue-50/60'
       : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
   }`;
+
+/** Portal + full viewport: header uses backdrop-blur which traps `fixed` to the header strip. */
+const MENU_MODAL_OVERLAY_CLASS =
+  'fixed inset-0 z-[100] min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 bg-black/40 overflow-y-auto overscroll-contain';
+
+const MENU_MODAL_PANEL_CLASS =
+  'w-full max-w-sm max-h-[min(90dvh,36rem)] overflow-y-auto rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4 my-auto';
 
 function SectionTabs() {
   return (
@@ -133,7 +141,7 @@ function HeaderBrowseMenu() {
       await updateProfile({ nickname: draftNickname.trim().slice(0, 48) });
       setNicknameModalOpen(false);
     } catch (err) {
-      setNicknameError(err.response?.data?.error || 'Could not save display name');
+      setNicknameError(err.response?.data?.error || 'Could not save name');
     } finally {
       setNicknameSaving(false);
     }
@@ -209,7 +217,7 @@ function HeaderBrowseMenu() {
                 setNicknameModalOpen(true);
               }}
             >
-              Display name
+              Set Name
             </button>
           )}
           <button
@@ -247,18 +255,16 @@ function HeaderBrowseMenu() {
           </a>
         </div>
       )}
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="country-set-title"
-          onClick={() => setModalOpen(false)}
-        >
+      {modalOpen &&
+        createPortal(
           <div
-            className="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className={MENU_MODAL_OVERLAY_CLASS}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="country-set-title"
+            onClick={() => setModalOpen(false)}
           >
+            <div className={MENU_MODAL_PANEL_CLASS} onClick={(e) => e.stopPropagation()}>
             <h2 id="country-set-title" className="text-lg font-bold text-slate-900">
               Set country
             </h2>
@@ -301,21 +307,20 @@ function HeaderBrowseMenu() {
                 Apply
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {passwordModalOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="password-change-title"
-          onClick={() => !pwdSaving && setPasswordModalOpen(false)}
-        >
+            </div>
+          </div>,
+          document.body
+        )}
+      {passwordModalOpen &&
+        createPortal(
           <div
-            className="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className={MENU_MODAL_OVERLAY_CLASS}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="password-change-title"
+            onClick={() => !pwdSaving && setPasswordModalOpen(false)}
           >
+            <div className={MENU_MODAL_PANEL_CLASS} onClick={(e) => e.stopPropagation()}>
             <h2 id="password-change-title" className="text-lg font-bold text-slate-900">
               {hasPassword ? 'Change password' : 'Set password'}
             </h2>
@@ -386,30 +391,29 @@ function HeaderBrowseMenu() {
                 {pwdSaving ? 'Saving…' : 'Save'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {nicknameModalOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="nickname-set-title"
-          onClick={() => !nicknameSaving && setNicknameModalOpen(false)}
-        >
+            </div>
+          </div>,
+          document.body
+        )}
+      {nicknameModalOpen &&
+        createPortal(
           <div
-            className="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className={MENU_MODAL_OVERLAY_CLASS}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="set-name-title"
+            onClick={() => !nicknameSaving && setNicknameModalOpen(false)}
           >
-            <h2 id="nickname-set-title" className="text-lg font-bold text-slate-900">
-              Display name
+            <div className={MENU_MODAL_PANEL_CLASS} onClick={(e) => e.stopPropagation()}>
+            <h2 id="set-name-title" className="text-lg font-bold text-slate-900">
+              Set Name
             </h2>
             <p className="text-sm text-slate-600">
               This is how you appear in the header, chats, and on your listings. Leave blank to show a masked phone number
               instead (e.g. ••••••57).
             </p>
             <label className="block">
-              <span className="text-xs font-medium text-slate-600">Nickname</span>
+              <span className="text-xs font-medium text-slate-600">Name</span>
               <input
                 type="text"
                 autoComplete="nickname"
@@ -440,8 +444,9 @@ function HeaderBrowseMenu() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
