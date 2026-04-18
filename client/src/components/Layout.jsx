@@ -45,18 +45,27 @@ function SectionTabs() {
   );
 }
 
+const PASSWORD_MIN_LEN = 8;
+
 function HeaderBrowseMenu() {
   const { country, setCountryAndFocus } = useBrowseScope();
-  const { isAuthenticated, user, updateProfile } = useAuth();
+  const { isAuthenticated, user, updateProfile, setPassword } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [countryList, setCountryList] = useState([]);
   const [draftCountry, setDraftCountry] = useState(country);
   const [draftNickname, setDraftNickname] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState('');
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
   const wrapRef = useRef(null);
+  const hasPassword = Boolean(user?.hasPassword);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +109,15 @@ function HeaderBrowseMenu() {
     }
   }, [nicknameModalOpen, user?.nickname]);
 
+  useEffect(() => {
+    if (passwordModalOpen) {
+      setPwdCurrent('');
+      setPwdNew('');
+      setPwdConfirm('');
+      setPwdError('');
+    }
+  }, [passwordModalOpen]);
+
   async function saveNickname() {
     setNicknameError('');
     setNicknameSaving(true);
@@ -110,6 +128,36 @@ function HeaderBrowseMenu() {
       setNicknameError(err.response?.data?.error || 'Could not save display name');
     } finally {
       setNicknameSaving(false);
+    }
+  }
+
+  async function savePassword() {
+    setPwdError('');
+    const next = pwdNew.trim();
+    const confirm = pwdConfirm.trim();
+    if (next.length < PASSWORD_MIN_LEN) {
+      setPwdError(`Use at least ${PASSWORD_MIN_LEN} characters.`);
+      return;
+    }
+    if (next !== confirm) {
+      setPwdError('New passwords do not match.');
+      return;
+    }
+    if (hasPassword && !pwdCurrent) {
+      setPwdError('Enter your current password.');
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await setPassword({
+        password: next,
+        ...(hasPassword ? { currentPassword: pwdCurrent } : {}),
+      });
+      setPasswordModalOpen(false);
+    } catch (err) {
+      setPwdError(err.response?.data?.error || 'Could not update password');
+    } finally {
+      setPwdSaving(false);
     }
   }
 
@@ -166,6 +214,19 @@ function HeaderBrowseMenu() {
           >
             Set country
           </button>
+          {isAuthenticated && (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full text-left px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50 border-t border-slate-100 font-medium"
+              onClick={() => {
+                setMenuOpen(false);
+                setPasswordModalOpen(true);
+              }}
+            >
+              Change password
+            </button>
+          )}
           <a
             href={`mailto:${SUPPORT_EMAIL}`}
             role="menuitem"
@@ -229,6 +290,83 @@ function HeaderBrowseMenu() {
                 disabled={!draftCountry.trim()}
               >
                 Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {passwordModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="password-change-title"
+          onClick={() => !pwdSaving && setPasswordModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="password-change-title" className="text-lg font-bold text-slate-900">
+              {hasPassword ? 'Change password' : 'Set password'}
+            </h2>
+            <p className="text-sm text-slate-600">
+              {hasPassword
+                ? 'Enter your current password, then choose a new one (at least 8 characters).'
+                : 'Add a password (at least 8 characters). You can still sign in with your phone.'}
+            </p>
+            {hasPassword && (
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">Current password</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwdCurrent}
+                  onChange={(e) => setPwdCurrent(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                />
+              </label>
+            )}
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">
+                {hasPassword ? 'New password' : 'Password'}
+              </span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={pwdNew}
+                onChange={(e) => setPwdNew(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                placeholder={`At least ${PASSWORD_MIN_LEN} characters`}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">Confirm password</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={pwdConfirm}
+                onChange={(e) => setPwdConfirm(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+              />
+            </label>
+            {pwdError && <p className="text-sm text-red-600">{pwdError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                disabled={pwdSaving}
+                onClick={() => setPasswordModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-blue text-white hover:bg-blue-800 disabled:opacity-60"
+                disabled={pwdSaving}
+                onClick={() => savePassword()}
+              >
+                {pwdSaving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>

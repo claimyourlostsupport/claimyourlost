@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
+
+const BCRYPT_ROUNDS = 10;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
 
 const router = Router();
 
@@ -95,11 +100,62 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
     res.json({
-      user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
+      user: {
+        id: user._id,
+        phone: user.phone,
+        nickname: user.nickname || '',
+        hasPassword: Boolean(user.passwordHash),
+      },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+router.post('/password', requireAuth, async (req, res) => {
+  try {
+    const { password, currentPassword } = req.body;
+    if (password == null || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+    const pw = password.trim();
+    if (pw.length < PASSWORD_MIN) {
+      return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN} characters` });
+    }
+    if (pw.length > PASSWORD_MAX) {
+      return res.status(400).json({ error: 'Password is too long' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (user.passwordHash) {
+      if (currentPassword == null || typeof currentPassword !== 'string') {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+      const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!ok) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    user.passwordHash = await bcrypt.hash(pw, BCRYPT_ROUNDS);
+    await user.save();
+
+    res.json({
+      user: {
+        id: user._id,
+        phone: user.phone,
+        nickname: user.nickname || '',
+        hasPassword: true,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not update password' });
   }
 });
 
@@ -115,7 +171,12 @@ router.patch('/me', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
     res.json({
-      user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
+      user: {
+        id: user._id,
+        phone: user.phone,
+        nickname: user.nickname || '',
+        hasPassword: Boolean(user.passwordHash),
+      },
     });
   } catch (err) {
     console.error(err);

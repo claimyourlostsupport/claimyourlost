@@ -12,7 +12,12 @@ const STORAGE_KEY = 'cyl_token';
 const USER_KEY = 'cyl_user';
 
 function stripForStorage(u) {
-  return { id: u.id, phone: u.phone, nickname: u.nickname || '' };
+  return {
+    id: u.id,
+    phone: u.phone,
+    nickname: u.nickname || '',
+    hasPassword: Boolean(u.hasPassword),
+  };
 }
 
 export function AuthProvider({ children }) {
@@ -125,6 +130,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const setPassword = useCallback(
+    async ({ password, currentPassword }) => {
+      try {
+        const { data } = await api.post('/auth/password', { password, currentPassword });
+        if (data?.user) replaceUser(data.user);
+        return data;
+      } catch (err) {
+        invalidateSessionIfNeeded(err);
+        throw err;
+      }
+    },
+    [replaceUser, invalidateSessionIfNeeded]
+  );
+
   const requestOtp = async (phone) => {
     return api.post('/auth/request-otp', { phone });
   };
@@ -148,9 +167,10 @@ export function AuthProvider({ children }) {
       requestOtp,
       refreshUser,
       updateProfile,
+      setPassword,
       dismissNewUserPrompt,
     }),
-    [user, token, loading, dismissNewUserPrompt]
+    [user, token, loading, dismissNewUserPrompt, setPassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

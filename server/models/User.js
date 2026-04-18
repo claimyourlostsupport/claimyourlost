@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema(
       maxlength: 48,
       default: '',
     },
+    /** bcrypt hash; null/empty means user has not set a password yet (phone OTP is still valid). */
+    passwordHash: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
