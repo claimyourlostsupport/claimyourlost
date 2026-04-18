@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -38,8 +39,10 @@ router.post('/login', async (req, res) => {
     }
 
     let user = await User.findOne({ phone: normalized });
+    let isNewUser = false;
     if (!user) {
       user = await User.create({ phone: normalized });
+      isNewUser = true;
     }
 
     const secret = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -49,7 +52,12 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, phone: user.phone },
+      user: {
+        id: user._id,
+        phone: user.phone,
+        nickname: user.nickname || '',
+        isNewUser,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -76,6 +84,41 @@ router.post('/request-otp', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not send OTP' });
+  }
+});
+
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).lean();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+router.patch('/me', requireAuth, async (req, res) => {
+  try {
+    if (!('nickname' in req.body)) {
+      return res.status(400).json({ error: 'nickname is required' });
+    }
+    const raw = req.body.nickname;
+    const nickname = raw == null || raw === '' ? '' : String(raw).trim().slice(0, 48);
+    const user = await User.findByIdAndUpdate(req.userId, { $set: { nickname } }, { new: true }).lean();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      user: { id: user._id, phone: user.phone, nickname: user.nickname || '' },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not update profile' });
   }
 });
 

@@ -1,48 +1,18 @@
 /**
- * Deletes all lost/found listings and related data (claims, chats, match notifications)
- * and removes image files under server/uploads/.
+ * Full test reset: MongoDB (users, items, SocialHub posts, messages, claims, notifications),
+ * local media under server/uploads/, and Cloudinary (item + social) when env is configured.
  *
  * Usage (from server/):
+ *   npm run clean-all
  *   node scripts/clearAllItems.js --yes
  *
- * Requires --yes (or -y) to run, to avoid accidental execution.
- * Uses MONGODB_URI from .env (or default mongodb://127.0.0.1:27017/claimyourlost).
+ * Requires --yes or -y so it never runs by accident.
+ * Uses MONGODB_URI from .env (default mongodb://127.0.0.1:27017/claimyourlost).
  */
 
 import 'dotenv/config';
 import mongoose from 'mongoose';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-import { Item } from '../models/Item.js';
-import { Message } from '../models/Message.js';
-import { Claim } from '../models/Claim.js';
-import { Notification } from '../models/Notification.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-async function clearUploadsDir(uploadDir) {
-  let removed = 0;
-  try {
-    const names = await fs.readdir(uploadDir);
-    for (const name of names) {
-      if (name === '.gitkeep') continue;
-      const full = path.join(uploadDir, name);
-      const stat = await fs.stat(full);
-      if (stat.isFile()) {
-        await fs.unlink(full);
-        removed += 1;
-      }
-    }
-  } catch (e) {
-    if (e.code === 'ENOENT') {
-      return 0;
-    }
-    throw e;
-  }
-  return removed;
-}
+import { executeFullDataReset } from '../services/fullDataReset.js';
 
 async function main() {
   const ok = process.argv.includes('--yes') || process.argv.includes('-y');
@@ -55,20 +25,18 @@ async function main() {
   await mongoose.connect(uri);
   console.log('Connected:', uri.replace(/\/\/.*@/, '//***@'));
 
-  const msg = await Message.deleteMany({});
-  const cl = await Claim.deleteMany({});
-  const notif = await Notification.deleteMany({});
-  const items = await Item.deleteMany({});
-
-  const uploadDir = path.join(__dirname, '..', 'uploads');
-  const filesRemoved = await clearUploadsDir(uploadDir);
+  const deleted = await executeFullDataReset();
 
   console.log('Deleted:');
-  console.log(`  messages:      ${msg.deletedCount}`);
-  console.log(`  claims:        ${cl.deletedCount}`);
-  console.log(`  notifications: ${notif.deletedCount}`);
-  console.log(`  items:         ${items.deletedCount}`);
-  console.log(`  upload files:  ${filesRemoved} (in uploads/)`);
+  console.log(`  messages:         ${deleted.messages}`);
+  console.log(`  claims:           ${deleted.claims}`);
+  console.log(`  notifications:    ${deleted.notifications}`);
+  console.log(`  items:            ${deleted.items}`);
+  console.log(`  social posts:     ${deleted.socialPosts}`);
+  console.log(`  users:            ${deleted.users}`);
+  console.log(`  upload files:     ${deleted.uploadFiles} (uploads/*)`);
+  console.log(`  cloudinary items: ${deleted.cloudinaryItems}`);
+  console.log(`  cloudinary social:${deleted.cloudinarySocial}`);
 
   await mongoose.disconnect();
   console.log('Done.');

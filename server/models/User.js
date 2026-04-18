@@ -8,6 +8,12 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    nickname: {
+      type: String,
+      trim: true,
+      maxlength: 48,
+      default: '',
+    },
   },
   { timestamps: true }
 );

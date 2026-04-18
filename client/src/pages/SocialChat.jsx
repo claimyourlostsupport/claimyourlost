@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
+import { publicUserLabel } from '../utils/publicUserLabel.js';
 
 const SOCIALHUB_CHAT_POLL_MS = 4000;
 
@@ -161,7 +162,7 @@ export function SocialChat() {
                 >
                   {!mine && (
                     <p className="text-[10px] uppercase tracking-wide opacity-70 mb-1">
-                      {m.senderId?.phone ? `••••${String(m.senderId.phone).slice(-4)}` : 'User'}
+                      {publicUserLabel(m.senderId)}
                     </p>
                   )}
                   <p className="whitespace-pre-wrap break-words">{m.text}</p>

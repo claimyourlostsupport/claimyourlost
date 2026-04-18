@@ -60,7 +60,7 @@ router.get('/', async (_req, res) => {
     const posts = await SocialPost.find()
       .sort({ createdAt: -1 })
       .limit(200)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(posts);
   } catch (err) {
@@ -83,7 +83,7 @@ router.get('/near', async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .limit(500)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
 
     const filtered = all
@@ -103,7 +103,7 @@ router.get('/near', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const post = await SocialPost.findById(req.params.id).populate('userId', 'phone').lean();
+    const post = await SocialPost.findById(req.params.id).populate('userId', 'phone nickname').lean();
     if (!post) return res.status(404).json({ error: 'Post not found' });
     res.json(post);
   } catch (err) {
@@ -212,7 +212,7 @@ router.post('/', requireAuth, (req, res, next) => {
       imagePublicId,
     });
 
-    const populated = await SocialPost.findById(post._id).populate('userId', 'phone').lean();
+    const populated = await SocialPost.findById(post._id).populate('userId', 'phone nickname').lean();
     res.status(201).json(populated);
   } catch (err) {
     console.error(err);

@@ -9,6 +9,7 @@ import {
   listingImagePlaceholderClass,
 } from '../constants/images.js';
 import { formatItemCategory } from '../constants/categories.js';
+import { publicUserLabel } from '../utils/publicUserLabel.js';
 
 function formatDetailDate(d) {
   if (!d) return '';
@@ -21,11 +22,6 @@ function formatDetailDate(d) {
     month: 'long',
     year: 'numeric',
   });
-}
-
-function maskPhone(phone) {
-  if (!phone || phone.length < 4) return '••••';
-  return `••••${phone.slice(-4)}`;
 }
 
 export function ItemDetail() {
@@ -82,7 +78,7 @@ export function ItemDetail() {
   const ownerId = item?.userId?._id ?? item?.userId;
   const isOwner =
     Boolean(item && user && ownerId && String(ownerId) === String(user.id));
-  const ownerPhone = item?.userId?.phone;
+  const ownerProfile = item?.userId && typeof item.userId === 'object' ? item.userId : null;
 
   async function submitClaim(e) {
     e.preventDefault();
@@ -181,9 +177,9 @@ export function ItemDetail() {
             <p>
               <span className="font-medium text-slate-800">📅</span> {formatDetailDate(item.date)}
             </p>
-            {ownerPhone && (
+            {ownerProfile && (
               <p className="text-slate-500">
-                Listed by: <span className="font-mono">{maskPhone(ownerPhone)}</span>
+                Listed by: <span className="font-mono">{publicUserLabel(ownerProfile)}</span>
               </p>
             )}
             {String(item.category || '').toLowerCase() === 'pets' &&

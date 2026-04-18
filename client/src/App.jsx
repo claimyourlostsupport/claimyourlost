@@ -14,6 +14,7 @@ import { EventNews } from './pages/EventNews.jsx';
 import { SocialHub } from './pages/SocialHub.jsx';
 import { Looking } from './pages/Looking.jsx';
 import { SocialChat } from './pages/SocialChat.jsx';
+import { Favorites } from './pages/Favorites.jsx';
 
 export default function App() {
   return (
@@ -29,9 +30,11 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/social-hub/:id" element={<SocialHub />} />
         <Route path="/social-hub" element={<SocialHub />} />
         <Route path="/looking" element={<Looking />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/favorites" element={<Favorites />} />
         <Route path="/map" element={<MapView />} />
         <Route path="/items/:id" element={<ItemDetail />} />
         <Route path="/post" element={<PostItem />} />

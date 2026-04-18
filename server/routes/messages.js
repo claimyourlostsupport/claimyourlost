@@ -125,7 +125,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
 
       const populated = await Message.findById(msg._id)
-        .populate('senderId', 'phone')
+        .populate('senderId', 'phone nickname')
         .lean();
       return res.status(201).json(populated);
     }
@@ -161,7 +161,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
 
       const populated = await Message.findById(msg._id)
-        .populate('senderId', 'phone')
+        .populate('senderId', 'phone nickname')
         .lean();
       return res.status(201).json(populated);
     }
@@ -185,7 +185,7 @@ router.get('/social/:socialPostId', requireAuth, async (req, res) => {
 
     const messages = await Message.find({ socialPostId: req.params.socialPostId })
       .sort({ createdAt: 1 })
-      .populate('senderId', 'phone')
+      .populate('senderId', 'phone nickname')
       .lean();
 
     res.json(messages);
@@ -213,7 +213,7 @@ router.get('/:itemId', requireAuth, async (req, res) => {
 
     const messages = await Message.find({ itemId: req.params.itemId })
       .sort({ createdAt: 1 })
-      .populate('senderId', 'phone')
+      .populate('senderId', 'phone nickname')
       .lean();
 
     res.json(messages);

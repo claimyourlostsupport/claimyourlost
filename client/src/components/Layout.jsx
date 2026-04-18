@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useBrowseScope } from '../context/BrowseScopeContext.jsx';
@@ -6,6 +6,8 @@ import { api } from '../api/client.js';
 import { mergeCountryOptions } from '../constants/countries.js';
 import { paypalSupportUrl, SUPPORT_EMAIL } from '../constants/support.js';
 import { NotificationBell } from './NotificationBell.jsx';
+import { lossFoundSearchUrl } from '../utils/browseSearchUrl.js';
+import { publicUserLabel } from '../utils/publicUserLabel.js';
 
 const navClass = ({ isActive }) =>
   `flex flex-col items-center gap-0.5 px-1.5 sm:px-3 py-2 text-[10px] sm:text-xs font-medium rounded-xl transition-colors min-w-0 flex-1 ${
@@ -45,10 +47,15 @@ function SectionTabs() {
 
 function HeaderBrowseMenu() {
   const { country, setCountryAndFocus } = useBrowseScope();
+  const { isAuthenticated, user, updateProfile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
   const [countryList, setCountryList] = useState([]);
   const [draftCountry, setDraftCountry] = useState(country);
+  const [draftNickname, setDraftNickname] = useState('');
+  const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [nicknameError, setNicknameError] = useState('');
   const wrapRef = useRef(null);
 
   useEffect(() => {
@@ -86,6 +93,26 @@ function HeaderBrowseMenu() {
     if (modalOpen) setDraftCountry(country);
   }, [modalOpen, country]);
 
+  useEffect(() => {
+    if (nicknameModalOpen) {
+      setDraftNickname(String(user?.nickname ?? '').trim());
+      setNicknameError('');
+    }
+  }, [nicknameModalOpen, user?.nickname]);
+
+  async function saveNickname() {
+    setNicknameError('');
+    setNicknameSaving(true);
+    try {
+      await updateProfile({ nickname: draftNickname.trim().slice(0, 48) });
+      setNicknameModalOpen(false);
+    } catch (err) {
+      setNicknameError(err.response?.data?.error || 'Could not save display name');
+    } finally {
+      setNicknameSaving(false);
+    }
+  }
+
   return (
     <div className="relative shrink-0" ref={wrapRef}>
       <button
@@ -107,15 +134,27 @@ function HeaderBrowseMenu() {
           className="absolute right-0 top-full mt-1 z-50 min-w-[13.5rem] rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           role="menu"
         >
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
+          <Link
+            to="/favorites"
             role="menuitem"
-            className="block px-3 py-2.5 text-sm hover:bg-slate-50"
+            className="block px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50 font-medium"
             onClick={() => setMenuOpen(false)}
           >
-            <span className="block font-medium text-slate-800">Contact us</span>
-            <span className="block text-xs text-slate-500 truncate mt-0.5">{SUPPORT_EMAIL}</span>
-          </a>
+            Favorite
+          </Link>
+          {isAuthenticated && (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full text-left px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50 border-t border-slate-100 font-medium"
+              onClick={() => {
+                setMenuOpen(false);
+                setNicknameModalOpen(true);
+              }}
+            >
+              Display name
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -127,6 +166,15 @@ function HeaderBrowseMenu() {
           >
             Set country
           </button>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            role="menuitem"
+            className="block px-3 py-2.5 text-sm hover:bg-slate-50 border-t border-slate-100"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span className="block font-medium text-slate-800">Contact us</span>
+            <span className="block text-xs text-slate-500 truncate mt-0.5">{SUPPORT_EMAIL}</span>
+          </a>
         </div>
       )}
       {modalOpen && (
@@ -186,6 +234,59 @@ function HeaderBrowseMenu() {
           </div>
         </div>
       )}
+      {nicknameModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="nickname-set-title"
+          onClick={() => !nicknameSaving && setNicknameModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl border border-slate-200 p-4 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="nickname-set-title" className="text-lg font-bold text-slate-900">
+              Display name
+            </h2>
+            <p className="text-sm text-slate-600">
+              This is how you appear in the header, chats, and on your listings. Leave blank to show a masked phone number
+              instead (e.g. ••••••57).
+            </p>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">Nickname</span>
+              <input
+                type="text"
+                autoComplete="nickname"
+                maxLength={48}
+                value={draftNickname}
+                onChange={(e) => setDraftNickname(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                placeholder="e.g. Alex"
+              />
+            </label>
+            {nicknameError && <p className="text-sm text-red-600">{nicknameError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                disabled={nicknameSaving}
+                onClick={() => setNicknameModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-blue text-white hover:bg-blue-800 disabled:opacity-60"
+                disabled={nicknameSaving}
+                onClick={() => saveNickname()}
+              >
+                {nicknameSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -193,6 +294,11 @@ function HeaderBrowseMenu() {
 export function Layout() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const { scope, country: browseCountry } = useBrowseScope();
+  const searchNavTo = useMemo(
+    () => lossFoundSearchUrl(scope, browseCountry),
+    [scope, browseCountry]
+  );
 
   return (
     <div className="min-h-screen flex flex-col pb-24 md:pb-0">
@@ -223,7 +329,7 @@ export function Layout() {
             {isAuthenticated ? (
               <>
                 <span className="hidden sm:inline text-sm text-slate-600 truncate max-w-[140px]">
-                  {user?.phone}
+                  {publicUserLabel(user)}
                 </span>
                 <button
                   type="button"
@@ -268,7 +374,7 @@ export function Layout() {
             <span className="text-xl leading-none">➕</span>
             Post
           </NavLink>
-          <NavLink to="/search" className={navClass}>
+          <NavLink to={searchNavTo} className={navClass}>
             <span className="text-xl leading-none">🔍</span>
             Search
           </NavLink>

@@ -8,30 +8,25 @@ import { Item } from '../models/Item.js';
 import { Message } from '../models/Message.js';
 import { Claim } from '../models/Claim.js';
 import { Notification } from '../models/Notification.js';
-import { deleteCloudinaryImage, isCloudinaryEnabled } from '../services/cloudinaryStorage.js';
+import { SocialPost } from '../models/SocialPost.js';
+import { deleteCloudinaryImage, deleteCloudinaryMedia } from '../services/cloudinaryStorage.js';
+import { executeFullDataReset } from '../services/fullDataReset.js';
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-async function clearUploadsDir(uploadDir) {
-  let removed = 0;
-  try {
-    const names = await fs.readdir(uploadDir);
-    for (const name of names) {
-      if (name === '.gitkeep') continue;
-      const full = path.join(uploadDir, name);
-      const stat = await fs.stat(full);
-      if (stat.isFile()) {
-        await fs.unlink(full);
-        removed += 1;
-      }
-    }
-  } catch (e) {
-    if (e.code === 'ENOENT') return 0;
-    throw e;
-  }
-  return removed;
-}
+/** Lets you verify the deployed API includes admin routes (no token). */
+router.get('/', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'admin',
+    posts: [
+      'POST /admin/clear-all-items',
+      'POST /admin/clear-item/:itemId',
+      'POST /admin/clear-social-post/:postId',
+    ],
+  });
+});
 
 function getTokenFromReq(req) {
   return String(req.headers['x-admin-token'] || '').trim();
@@ -69,11 +64,38 @@ async function removeCloudinaryImageForItem(item) {
   return deleteCloudinaryImage(publicId);
 }
 
+async function removeUploadedFileForSocialPost(post) {
+  const p = String(post?.mediaUrl || '').trim();
+  if (!p || !p.startsWith('/uploads/')) return false;
+  const filename = p.replace('/uploads/', '').trim();
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return false;
+  }
+  const uploadDir = path.join(__dirname, '..', 'uploads');
+  const full = path.join(uploadDir, filename);
+  try {
+    await fs.unlink(full);
+    return true;
+  } catch (e) {
+    if (e.code === 'ENOENT') return false;
+    throw e;
+  }
+}
+
+async function removeCloudinaryForSocialPost(post) {
+  const publicId = String(post?.imagePublicId || '').trim();
+  if (!publicId) return false;
+  const rt = post.mediaType === 'video' ? 'video' : 'image';
+  return deleteCloudinaryMedia(publicId, rt);
+}
+
 /**
- * Production-safe reset endpoint for test environments.
+ * Full test reset (same as `npm run clean-all` in server/): users, items, SocialHub posts,
+ * messages, claims, notifications, uploads/*, Cloudinary item + social media.
+ *
  * Required:
  * - Header: x-admin-token: <CLEAR_DATA_TOKEN>
- * - Body: { "confirm": "DELETE_ALL_ITEMS" }
+ * - Body: { "confirm": "DELETE_ALL_DATA" } or { "confirm": "DELETE_ALL_ITEMS" } (legacy alias)
  */
 router.post('/clear-all-items', async (req, res) => {
   try {
@@ -86,39 +108,32 @@ router.post('/clear-all-items', async (req, res) => {
     }
 
     const confirm = String(req.body?.confirm || '').trim();
-    if (confirm !== 'DELETE_ALL_ITEMS') {
-      return res.status(400).json({ error: 'Missing confirm=DELETE_ALL_ITEMS' });
+    if (confirm !== 'DELETE_ALL_DATA' && confirm !== 'DELETE_ALL_ITEMS') {
+      return res.status(400).json({
+        error: 'Missing confirm: use DELETE_ALL_DATA (or legacy DELETE_ALL_ITEMS)',
+      });
     }
 
-    const allItems = await Item.find({}).select('_id image imagePublicId').lean();
-    const msg = await Message.deleteMany({});
-    const cl = await Claim.deleteMany({});
-    const notif = await Notification.deleteMany({});
-    const items = await Item.deleteMany({});
-
-    const uploadDir = path.join(__dirname, '..', 'uploads');
-    const filesRemoved = await clearUploadsDir(uploadDir);
-    let cloudinaryRemoved = 0;
-    if (isCloudinaryEnabled()) {
-      for (const it of allItems) {
-        if (await removeCloudinaryImageForItem(it)) cloudinaryRemoved += 1;
-      }
-    }
+    const deleted = await executeFullDataReset();
 
     return res.json({
       ok: true,
       deleted: {
-        messages: msg.deletedCount || 0,
-        claims: cl.deletedCount || 0,
-        notifications: notif.deletedCount || 0,
-        items: items.deletedCount || 0,
-        uploadFiles: filesRemoved,
-        cloudinaryImages: cloudinaryRemoved,
+        messages: deleted.messages,
+        claims: deleted.claims,
+        notifications: deleted.notifications,
+        items: deleted.items,
+        socialPosts: deleted.socialPosts,
+        users: deleted.users,
+        uploadFiles: deleted.uploadFiles,
+        cloudinaryItems: deleted.cloudinaryItems,
+        cloudinarySocial: deleted.cloudinarySocial,
+        cloudinaryImages: deleted.cloudinaryImages,
       },
     });
   } catch (err) {
     console.error('clear-all-items failed:', err);
-    return res.status(500).json({ error: 'Failed to clear items' });
+    return res.status(500).json({ error: 'Failed to clear data' });
   }
 });
 
@@ -176,6 +191,59 @@ router.post('/clear-item/:itemId', async (req, res) => {
   } catch (err) {
     console.error('clear-item failed:', err);
     return res.status(500).json({ error: 'Failed to clear item' });
+  }
+});
+
+/**
+ * Deletes one SocialHub post and related chat + notifications; removes local / Cloudinary media.
+ * Required:
+ * - Header: x-admin-token: <CLEAR_DATA_TOKEN>
+ * - Body: { "confirm": "DELETE_ONE_SOCIAL_POST" }
+ */
+router.post('/clear-social-post/:postId', async (req, res) => {
+  try {
+    const auth = hasValidAdminToken(req);
+    if (!auth.ok && auth.reason === 'missing_server_token') {
+      return res.status(503).json({ error: 'CLEAR_DATA_TOKEN is not configured' });
+    }
+    if (!auth.ok) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const confirm = String(req.body?.confirm || '').trim();
+    if (confirm !== 'DELETE_ONE_SOCIAL_POST') {
+      return res.status(400).json({ error: 'Missing confirm=DELETE_ONE_SOCIAL_POST' });
+    }
+
+    const postId = String(req.params.postId || '').trim();
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ error: 'Invalid postId' });
+    }
+
+    const post = await SocialPost.findById(postId).lean();
+    if (!post) {
+      return res.status(404).json({ error: 'Social post not found' });
+    }
+
+    const msg = await Message.deleteMany({ socialPostId: postId });
+    const notif = await Notification.deleteMany({ relatedSocialPostId: postId });
+    const deletedPost = await SocialPost.deleteOne({ _id: postId });
+    const removedFile = await removeUploadedFileForSocialPost(post);
+    const removedCloudinary = await removeCloudinaryForSocialPost(post);
+
+    return res.json({
+      ok: true,
+      deleted: {
+        messages: msg.deletedCount || 0,
+        notifications: notif.deletedCount || 0,
+        socialPosts: deletedPost.deletedCount || 0,
+        mediaFileRemoved: removedFile,
+        cloudinaryMediaRemoved: removedCloudinary,
+      },
+    });
+  } catch (err) {
+    console.error('clear-social-post failed:', err);
+    return res.status(500).json({ error: 'Failed to clear social post' });
   }
 });
 

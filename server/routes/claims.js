@@ -22,7 +22,7 @@ router.get('/mine', requireAuth, async (req, res) => {
     const claims = await Claim.find({ userId: req.userId })
       .sort({ createdAt: -1 })
       .populate('itemId')
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(claims);
   } catch (err) {
@@ -88,7 +88,7 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const populated = await Claim.findById(claim._id)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .populate('itemId');
     res.status(201).json(populated);
   } catch (err) {
@@ -116,7 +116,7 @@ router.get('/:itemId', requireAuth, async (req, res) => {
 
     const claims = await Claim.find({ itemId: req.params.itemId })
       .sort({ createdAt: -1 })
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
 
     res.json(claims);

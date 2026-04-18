@@ -72,7 +72,7 @@ app.get('/', (_req, res) => {
     service: 'claimyourlost-api',
     message: 'API is running. This URL serves JSON only — the public site is hosted elsewhere.',
     health: '/health',
-    routes: ['/auth', '/items', '/social-posts', '/claims', '/messages', '/notifications'],
+    routes: ['/auth', '/items', '/social-posts', '/claims', '/messages', '/notifications', '/admin'],
   });
 });
 

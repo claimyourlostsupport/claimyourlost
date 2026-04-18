@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearPersistedClientState } from '../utils/clearPersistedClientState.js';
 
 const baseURL = import.meta.env.VITE_API_URL ?? '/api';
 
@@ -20,6 +21,22 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const path = String(err.config?.url || '');
+    if (status === 401) {
+      const isPublicAuth =
+        path.includes('auth/login') || path.includes('auth/request-otp');
+      if (!isPublicAuth) {
+        clearPersistedClientState();
+      }
+    }
+    return Promise.reject(err);
+  }
+);
 
 export function setAuthToken(token) {
   if (token) {

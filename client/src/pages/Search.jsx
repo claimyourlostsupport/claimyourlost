@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { ItemCard } from '../components/ItemCard.jsx';
@@ -64,7 +64,8 @@ function searchApiParams({
 
 export function Search() {
   const [params, setParams] = useSearchParams();
-  const { country: browseCountry } = useBrowseScope();
+  const { country: browseCountry, scope: browseScope } = useBrowseScope();
+  const browseCountrySyncRef = useRef(null);
   const q = params.get('q') || '';
   const type = params.get('type') || '';
   const category = params.get('category') || 'all';
@@ -164,6 +165,34 @@ export function Search() {
   }, [q]);
 
   /**
+   * Loss & Found "Country" scope: keep `country` query aligned with header/Home browse country.
+   * Ref avoids re-applying after the user picks "All countries" in Adv (same browse key until header changes).
+   */
+  useEffect(() => {
+    if (browseScope !== 'country') {
+      browseCountrySyncRef.current = `scope:${browseScope}`;
+      return;
+    }
+    const bc = String(browseCountry || '').trim();
+    if (!bc) {
+      browseCountrySyncRef.current = 'country:empty';
+      return;
+    }
+    const syncKey = `country:${bc}`;
+    if (browseCountrySyncRef.current === syncKey) return;
+    browseCountrySyncRef.current = syncKey;
+
+    setParams((prev) => {
+      const urlC = prev.get('country') || '';
+      if (urlC === bc) return prev;
+      const next = new URLSearchParams(prev);
+      next.set('country', bc);
+      writeLocationPrefs(bc, prev.get('city') || '');
+      return next;
+    }, { replace: true });
+  }, [browseScope, browseCountry, setParams]);
+
+  /**
    * When URL has no country and no city: fill from GPS (once per tab session), else saved prefs,
    * else header browse country (BrowseScope). Re-runs when browseCountry arrives after first paint.
    */
@@ -171,6 +200,9 @@ export function Search() {
     const needsLocationDefaults =
       (country === 'all' || !country) && !String(city || '').trim();
     if (!needsLocationDefaults) return;
+
+    const skipGpsCountry =
+      browseScope === 'country' && String(browseCountry || '').trim();
 
     let cancelled = false;
     (async () => {
@@ -183,7 +215,7 @@ export function Search() {
         /* ignore */
       }
 
-      if (!gpsAttempted && navigator.geolocation && window.isSecureContext) {
+      if (!gpsAttempted && navigator.geolocation && window.isSecureContext && !skipGpsCountry) {
         try {
           try {
             sessionStorage.setItem('cyl_search_gps_try', '1');
@@ -209,7 +241,11 @@ export function Search() {
 
       const prefs = readLocationPrefs();
       if (!nextCountry) {
-        nextCountry = prefs.country || String(browseCountry || '').trim();
+        if (skipGpsCountry) {
+          nextCountry = '';
+        } else {
+          nextCountry = prefs.country || String(browseCountry || '').trim();
+        }
       }
       if (!nextCity) {
         nextCity = prefs.city;
@@ -217,7 +253,12 @@ export function Search() {
 
       if (cancelled) return;
       if (nextCountry || nextCity) {
-        writeLocationPrefs(nextCountry, nextCity);
+        const persistCountry =
+          nextCountry ||
+          (skipGpsCountry ? String(browseCountry || '').trim() : '') ||
+          prefs.country ||
+          '';
+        writeLocationPrefs(persistCountry, nextCity);
         setParams((prev) => {
           const next = new URLSearchParams(prev);
           if (nextCountry) next.set('country', nextCountry);
@@ -230,7 +271,7 @@ export function Search() {
     return () => {
       cancelled = true;
     };
-  }, [browseCountry, country, city, setParams]);
+  }, [browseScope, browseCountry, country, city, setParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -398,24 +439,21 @@ export function Search() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <button
             type="button"
             onClick={nearbyMode ? clearNearby : enableNearby}
             disabled={geoLoading}
-            className={`px-4 py-2 rounded-full text-sm font-semibold border ${
+            title={nearbyMode ? 'Tap to turn off nearby' : 'Use your location'}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 ${
               nearbyMode
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                 : 'bg-white border-slate-200 text-slate-800 hover:border-brand-blue'
             }`}
           >
-            {geoLoading
-              ? 'Locating…'
-              : nearbyMode
-                ? `✓ Nearby (${nearKm} km) — tap to clear`
-                : '📍 Near me (25 km)'}
+            {geoLoading ? '…' : nearbyMode ? `✓ ${nearKm} km` : '📍 Near me'}
           </button>
-          <div className="flex items-center gap-2 min-w-[220px]">
+          <div className="inline-flex items-center gap-1 shrink-0">
             <input
               type="range"
               min="0"
@@ -423,15 +461,18 @@ export function Search() {
               step="1"
               value={nearKm}
               onChange={(e) => setNearKm(Number(e.target.value))}
-              className="w-40 accent-brand-blue"
+              className="w-[4.5rem] sm:w-24 h-1 accent-brand-blue cursor-pointer"
               aria-label="Nearby distance in km"
             />
-            <span className="text-xs text-slate-600 w-16 text-right">{nearKm} km</span>
+            <span className="text-[10px] text-slate-600 tabular-nums leading-none whitespace-nowrap">
+              <span className="font-semibold text-slate-700">{nearKm}</span>
+              <span className="text-slate-500 ml-0.5">km</span>
+            </span>
           </div>
           <button
             type="button"
             onClick={() => setAdvOpen((o) => !o)}
-            className="ml-auto sm:ml-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border border-slate-200 bg-white text-slate-800 hover:border-brand-blue"
+            className="ml-auto sm:ml-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-200 bg-white text-slate-800 hover:border-brand-blue"
             aria-expanded={advOpen}
           >
             Adv Option
@@ -440,10 +481,9 @@ export function Search() {
             </span>
           </button>
           {nearbyMode && (
-            <span className="text-xs text-slate-600 w-full sm:w-auto max-w-xl">
-              Shows listings with a map pin within {nearKm} km when available. If none have GPS, results match your other
-              filters (same as a normal search).
-            </span>
+            <p className="text-[10px] text-slate-500 leading-snug w-full basis-full">
+              Pins within {nearKm} km; if none, matches your other filters.
+            </p>
           )}
         </div>
 

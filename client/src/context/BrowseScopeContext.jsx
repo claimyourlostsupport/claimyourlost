@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client.js';
+import { CLIENT_STORAGE_RESET_EVENT } from '../utils/clearPersistedClientState.js';
 
 const BOOT_KEY = 'cyl_browse_bootstrapped';
 const SCOPE_KEY = 'cyl_browse_scope';
@@ -91,6 +92,20 @@ export function BrowseScopeProvider({ children }) {
       setCountryState(next.country);
       setBootstrapping(false);
     });
+  }, []);
+
+  useEffect(() => {
+    function onClientStorageReset() {
+      setBootstrapping(true);
+      runFirstVisitBootstrap().then((next) => {
+        persist(next.scope, next.country);
+        setScopeState(next.scope);
+        setCountryState(next.country);
+        setBootstrapping(false);
+      });
+    }
+    window.addEventListener(CLIENT_STORAGE_RESET_EVENT, onClientStorageReset);
+    return () => window.removeEventListener(CLIENT_STORAGE_RESET_EVENT, onClientStorageReset);
   }, []);
 
   const setScope = useCallback((next) => {

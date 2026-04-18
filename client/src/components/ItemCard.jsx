@@ -7,10 +7,12 @@ import {
 import { formatItemCategory } from '../constants/categories.js';
 import { formatCalendarDate, formatDateTimeLocal } from '../utils/dateDisplay.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useFavorites } from '../context/FavoritesContext.jsx';
 
 export function ItemCard({ item }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const { user, isAuthenticated } = useAuth();
+  const { applyReaction: applyFavorite } = useFavorites();
   const initialReaction = (item.reactions || []).find((r) => String(r.userId) === String(user?.id))?.value || '';
   const [vote, setVote] = useState(initialReaction);
   const [likesCount, setLikesCount] = useState(Number(item.likesCount || 0));
@@ -46,6 +48,7 @@ export function ItemCard({ item }) {
       setVote(data.userReaction || '');
       setLikesCount(Number(data.likesCount || 0));
       setDislikesCount(Number(data.dislikesCount || 0));
+      applyFavorite('item', item._id, data.userReaction || '');
     } catch {
       /* ignore */
     } finally {

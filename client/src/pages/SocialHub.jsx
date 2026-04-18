@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { SocialPostCard } from '../components/SocialPostCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -54,6 +54,12 @@ async function getCurrentCoords() {
 
 export function SocialHub() {
   const { isAuthenticated } = useAuth();
+  const { id: routePostId } = useParams();
+  const sharedPostId = useMemo(() => {
+    const s = routePostId != null ? String(routePostId).trim() : '';
+    return /^[a-f0-9]{24}$/i.test(s) ? s : null;
+  }, [routePostId]);
+
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -68,7 +74,7 @@ export function SocialHub() {
   const [nearCoords, setNearCoords] = useState(null);
   const [nearLoading, setNearLoading] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -76,18 +82,45 @@ export function SocialHub() {
       const params =
         nearEnabled && nearCoords ? { lat: nearCoords.lat, lng: nearCoords.lng, km: nearKm } : undefined;
       const { data } = await api.get(endpoint, { params });
-      setPosts(Array.isArray(data) ? data : []);
+      let list = Array.isArray(data) ? data : [];
+
+      if (sharedPostId) {
+        const has = list.some((p) => String(p._id) === sharedPostId);
+        if (!has) {
+          try {
+            const { data: one } = await api.get(`/social-posts/${sharedPostId}`);
+            if (one?._id) {
+              list = [one, ...list.filter((p) => String(p._id) !== sharedPostId)];
+            }
+          } catch {
+            /* post missing or offline */
+          }
+        }
+      }
+
+      setPosts(list);
     } catch (e) {
       setError(e.response?.data?.error || 'Could not load posts');
       setPosts([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [nearEnabled, nearCoords, nearKm, sharedPostId]);
 
   useEffect(() => {
     load();
-  }, [nearEnabled, nearCoords, nearKm]);
+  }, [load]);
+
+  useEffect(() => {
+    if (!sharedPostId || loading || posts.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      document.getElementById(`social-post-${sharedPostId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [sharedPostId, loading, posts]);
 
   function openPostModal() {
     setPostError('');
@@ -147,7 +180,7 @@ export function SocialHub() {
 
   return (
     <div className="relative space-y-5 pb-20 md:pb-6">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <button
           type="button"
           onClick={async () => {
@@ -171,16 +204,17 @@ export function SocialHub() {
             }
           }}
           disabled={nearLoading}
-          className={`px-4 py-2 rounded-full text-sm font-semibold border ${
+          title={nearEnabled ? 'Tap to turn off nearby' : 'Use your location'}
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 ${
             nearEnabled
               ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
               : 'bg-white border-slate-200 text-slate-800 hover:border-brand-blue'
           }`}
         >
-          {nearLoading ? 'Locating…' : nearEnabled ? '✓ Near me' : '📍 Near me (25 km)'}
+          {nearLoading ? '…' : nearEnabled ? `✓ ${nearKm} km` : '📍 Near me'}
         </button>
 
-        <div className="flex items-center gap-2 min-w-[220px]">
+        <div className="inline-flex items-center gap-1 shrink-0">
           <input
             type="range"
             min="0"
@@ -188,10 +222,13 @@ export function SocialHub() {
             step="1"
             value={nearKm}
             onChange={(e) => setNearKm(Number(e.target.value))}
-            className="w-40 accent-brand-blue"
+            className="w-[4.5rem] sm:w-24 h-1 accent-brand-blue cursor-pointer"
             aria-label="Nearby distance in km"
           />
-          <span className="text-xs text-slate-600 w-16 text-right">{nearKm} km</span>
+          <span className="text-[10px] text-slate-600 tabular-nums leading-none whitespace-nowrap">
+            <span className="font-semibold text-slate-700">{nearKm}</span>
+            <span className="text-slate-500 ml-0.5">km</span>
+          </span>
         </div>
       </div>
 

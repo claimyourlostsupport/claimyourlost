@@ -3,13 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, assetUrl } from '../api/client';
 import { formatDateTimeLocal } from '../utils/dateDisplay.js';
 import { useAuth } from '../context/AuthContext.jsx';
-
-function maskPhone(phone) {
-  const s = phone != null ? String(phone).trim() : '';
-  if (!s) return 'Member';
-  if (s.length <= 4) return `••••${s}`;
-  return `••••${s.slice(-4)}`;
-}
+import { useFavorites } from '../context/FavoritesContext.jsx';
+import { publicUserLabel } from '../utils/publicUserLabel.js';
 
 const URL_RE = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
 
@@ -57,6 +52,7 @@ function renderLinkifiedText(text) {
 export function SocialPostCard({ post }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const { user, isAuthenticated } = useAuth();
+  const { applyReaction: applyFavorite } = useFavorites();
   const initialReaction = (post.reactions || []).find((r) => String(r.userId) === String(user?.id))?.value || '';
   const [vote, setVote] = useState(initialReaction);
   const [likesCount, setLikesCount] = useState(Number(post.likesCount || 0));
@@ -70,15 +66,15 @@ export function SocialPostCard({ post }) {
   const city = String(post?.city || '').trim();
   const country = String(post?.country || '').trim();
   const description = String(post?.description || '').trim();
-  const posterLabel = maskPhone(post?.userId?.phone);
+  const posterLabel = publicUserLabel(post?.userId);
   const dateLine = post?.createdAt ? formatDateTimeLocal(post.createdAt) : '';
   const metaParts = [dateLine, city || null, country || null].filter(Boolean);
   const metaLine = metaParts.join(' · ');
   const needsDescMore = description.length > 100;
 
   const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-  const sharePageUrl = `${siteBase.replace(/\/$/, '')}/social-hub`;
-  const shareText = `SocialHub on ClaimYourLost\n${sharePageUrl}\n${description ? description.slice(0, 120) + (description.length > 120 ? '…' : '') : 'New post'}`;
+  const sharePostUrl = `${siteBase.replace(/\/$/, '')}/social-hub/${post._id}`;
+  const shareText = `${description ? description.slice(0, 140) + (description.length > 140 ? '…' : '') : 'SocialHub post'}\n${sharePostUrl}`;
 
   const isVideo = post.mediaType === 'video';
 
@@ -91,6 +87,7 @@ export function SocialPostCard({ post }) {
       setVote(data.userReaction || '');
       setLikesCount(Number(data.likesCount || 0));
       setDislikesCount(Number(data.dislikesCount || 0));
+      applyFavorite('social', post._id, data.userReaction || '');
     } catch {
       /* ignore */
     } finally {
@@ -117,15 +114,15 @@ export function SocialPostCard({ post }) {
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(sharePageUrl);
+      await navigator.clipboard.writeText(sharePostUrl);
       setShareOpen(false);
     } catch {
-      window.prompt('Copy link:', sharePageUrl);
+      window.prompt('Copy link:', sharePostUrl);
     }
   }
 
   function openShare(kind) {
-    const encodedUrl = encodeURIComponent(sharePageUrl);
+    const encodedUrl = encodeURIComponent(sharePostUrl);
     const encodedText = encodeURIComponent(shareText);
     const encodedTitle = encodeURIComponent('ClaimYourLost SocialHub');
     let url = '';
@@ -154,7 +151,10 @@ export function SocialPostCard({ post }) {
   }
 
   return (
-    <article className="relative bg-white rounded-2xl shadow-sm border border-slate-100 p-4 min-h-[276px] flex flex-col hover:shadow-md transition-shadow">
+    <article
+      id={`social-post-${post._id}`}
+      className="relative bg-white rounded-2xl shadow-sm border border-slate-100 p-4 min-h-[276px] flex flex-col hover:shadow-md transition-shadow scroll-mt-24"
+    >
       <button
         type="button"
         onClick={() => setOverflowOpen((x) => !x)}

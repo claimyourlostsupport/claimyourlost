@@ -4,6 +4,7 @@ import { api, assetUrl } from '../api/client';
 import { listingImgClass, listingImageThumbBoxClass } from '../constants/images.js';
 import { formatCityCountryOrPlaceholder } from '../utils/place.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { publicUserLabel } from '../utils/publicUserLabel.js';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -90,7 +91,7 @@ export function Dashboard() {
     <div className="space-y-8 max-w-3xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-600 text-sm mt-1">Signed in as {user?.phone}</p>
+        <p className="text-slate-600 text-sm mt-1">Signed in as {publicUserLabel(user)}</p>
       </div>
 
       {loading ? (

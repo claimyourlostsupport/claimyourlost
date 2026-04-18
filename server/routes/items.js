@@ -285,7 +285,7 @@ router.post('/', requireAuth, (req, res, next) => {
       imagePublicId,
     });
 
-    const populated = await Item.findById(item._id).populate('userId', 'phone');
+    const populated = await Item.findById(item._id).populate('userId', 'phone nickname');
     notifyPotentialMatches(populated).catch((e) => console.error('match notify', e));
     res.status(201).json(populated);
   } catch (err) {
@@ -303,7 +303,7 @@ router.get('/map', async (_req, res) => {
     })
       .sort({ createdAt: -1 })
       .limit(500)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(items);
   } catch (err) {
@@ -341,7 +341,7 @@ router.get('/near', async (req, res) => {
     }
 
     const all = await Item.find(geoFilter)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
 
     const filtered = all
@@ -363,7 +363,7 @@ router.get('/mine', requireAuth, async (req, res) => {
   try {
     const items = await Item.find({ userId: req.userId })
       .sort({ createdAt: -1 })
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(items);
   } catch (err) {
@@ -484,7 +484,7 @@ router.get('/search', async (req, res) => {
     const items = await Item.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(items);
   } catch (err) {
@@ -502,7 +502,7 @@ router.get('/', async (req, res) => {
     const items = await Item.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('userId', 'phone')
+      .populate('userId', 'phone nickname')
       .lean();
     res.json(items);
   } catch (err) {
@@ -513,7 +513,7 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id).populate('userId', 'phone');
+    const item = await Item.findById(req.params.id).populate('userId', 'phone nickname');
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
     }
