@@ -5,13 +5,16 @@ import { User } from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const BCRYPT_ROUNDS = 10;
-const PASSWORD_MIN = 8;
-const PASSWORD_MAX = 128;
 
 const router = Router();
 
 function isSixDigits(otp) {
   return typeof otp === 'string' && /^\d{6}$/.test(otp.trim());
+}
+
+/** Account password / PIN: exactly six digits (same shape as phone OTP). */
+function isSixDigitPin(value) {
+  return typeof value === 'string' && /^\d{6}$/.test(String(value).trim());
 }
 
 function normalizePhone(phone) {
@@ -82,8 +85,9 @@ router.post('/login-password', async (req, res) => {
     if (!phone || typeof phone !== 'string' || phone.trim().length < 8) {
       return res.status(400).json({ error: 'Valid phone number is required' });
     }
-    if (password == null || typeof password !== 'string' || !String(password).length) {
-      return res.status(400).json({ error: 'Password is required' });
+    const pin = String(password ?? '').trim();
+    if (!isSixDigitPin(pin)) {
+      return res.status(400).json({ error: 'Password must be exactly 6 digits' });
     }
 
     const normalized = normalizePhone(phone);
@@ -92,7 +96,7 @@ router.post('/login-password', async (req, res) => {
       return res.status(400).json({ error: 'Invalid phone or password' });
     }
 
-    const ok = await bcrypt.compare(String(password), user.passwordHash);
+    const ok = await bcrypt.compare(pin, user.passwordHash);
     if (!ok) {
       return res.status(400).json({ error: 'Incorrect password' });
     }
@@ -143,7 +147,7 @@ router.post('/request-otp', async (req, res) => {
       hint:
         credentialMode === 'otp'
           ? `Enter last 6 digits of ${normalized}`
-          : 'Use the password you set for this account.',
+          : 'Enter your 6-digit account password.',
     });
   } catch (err) {
     console.error(err);
@@ -178,12 +182,9 @@ router.post('/password', requireAuth, async (req, res) => {
     if (password == null || typeof password !== 'string') {
       return res.status(400).json({ error: 'Password is required' });
     }
-    const pw = password.trim();
-    if (pw.length < PASSWORD_MIN) {
-      return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN} characters` });
-    }
-    if (pw.length > PASSWORD_MAX) {
-      return res.status(400).json({ error: 'Password is too long' });
+    const pw = String(password ?? '').trim();
+    if (!isSixDigitPin(pw)) {
+      return res.status(400).json({ error: 'Password must be exactly 6 digits' });
     }
 
     const user = await User.findById(req.userId);

@@ -9,7 +9,15 @@ import {
 
 const LOGIN_DIAL_STORAGE_KEY = 'cyl_login_dial';
 
-const PASSWORD_MIN = 8;
+const PIN_LENGTH = 6;
+
+function pinDigits(v) {
+  return String(v ?? '').replace(/\D/g, '').slice(0, PIN_LENGTH);
+}
+
+function isSixDigitPin(s) {
+  return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(String(s ?? ''));
+}
 
 export function Login() {
   const { login, loginWithPassword, requestOtp, updateProfile, setPassword, dismissNewUserPrompt } = useAuth();
@@ -65,7 +73,7 @@ export function Login() {
       setHint(
         data.hint ||
           (mode === 'password'
-            ? 'Use the password you set for this account.'
+            ? 'Enter your 6-digit account password.'
             : 'Enter the last 6 digits of your full phone number (including country code digits).')
       );
       setOtp('');
@@ -101,14 +109,15 @@ export function Login() {
   async function handleLoginWithPassword(e) {
     e.preventDefault();
     setError('');
-    if (!loginPass) {
-      setError('Enter your password.');
+    const pin = pinDigits(loginPass);
+    if (!isSixDigitPin(pin)) {
+      setError('Enter your 6-digit password.');
       return;
     }
     setLoading(true);
     try {
       const phone = buildFullPhone(dialCode, nationalNumber);
-      const data = await loginWithPassword(phone, loginPass);
+      const data = await loginWithPassword(phone, pin);
       if (data?.user?.isNewUser) {
         setStep('nickname');
         setNickname('');
@@ -151,10 +160,10 @@ export function Login() {
   async function handlePasswordSave(e) {
     e.preventDefault();
     setError('');
-    const p = newPassword.trim();
-    const c = confirmPassword.trim();
-    if (p.length < PASSWORD_MIN) {
-      setError(`Use at least ${PASSWORD_MIN} characters or tap Skip for now.`);
+    const p = pinDigits(newPassword);
+    const c = pinDigits(confirmPassword);
+    if (!isSixDigitPin(p)) {
+      setError(`Use exactly ${PIN_LENGTH} digits or tap Skip for now.`);
       return;
     }
     if (p !== c) {
@@ -201,12 +210,12 @@ export function Login() {
             {step === 'phone'
               ? 'Sign in with your phone. Tap Continue.'
               : step === 'credential' && credentialMode === 'password'
-                ? 'Use the password you saved for this account.'
+                ? 'Enter your 6-digit account password.'
                 : step === 'credential'
                   ? 'Enter the last 6 digits of your phone number to verify.'
                   : step === 'nickname'
                     ? 'This is how others will see you in chats and on listings. You can skip and appear as a masked phone number instead.'
-                    : 'Optional for now — phone sign-in still works. Use at least 8 characters if you continue, or skip and set this later from the menu.'}
+                    : `Optional for now — phone sign-in still works. Use exactly ${PIN_LENGTH} digits if you continue, or skip and set this later from the menu.`}
           </p>
         </div>
 
@@ -248,30 +257,34 @@ export function Login() {
           <form onSubmit={handlePasswordSave} className="space-y-4">
             <div>
               <label htmlFor="login-new-password" className="block text-sm font-medium text-slate-700 mb-1">
-                New password
+                Password (6 digits)
               </label>
               <input
                 id="login-new-password"
                 type="password"
+                inputMode="numeric"
                 autoComplete="new-password"
+                maxLength={PIN_LENGTH}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder={`At least ${PASSWORD_MIN} characters`}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
+                onChange={(e) => setNewPassword(pinDigits(e.target.value))}
+                placeholder="••••••"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg tracking-[0.35em] text-center font-mono focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
               />
             </div>
             <div>
               <label htmlFor="login-confirm-password" className="block text-sm font-medium text-slate-700 mb-1">
-                Confirm password
+                Confirm password (6 digits)
               </label>
               <input
                 id="login-confirm-password"
                 type="password"
+                inputMode="numeric"
                 autoComplete="new-password"
+                maxLength={PIN_LENGTH}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
+                onChange={(e) => setConfirmPassword(pinDigits(e.target.value))}
+                placeholder="••••••"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg tracking-[0.35em] text-center font-mono focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
@@ -359,22 +372,24 @@ export function Login() {
             {hint && <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{hint}</p>}
             <div>
               <label htmlFor="login-account-password" className="block text-sm font-medium text-slate-700 mb-1">
-                Password
+                Password (6 digits)
               </label>
               <input
                 id="login-account-password"
                 type="password"
+                inputMode="numeric"
                 autoComplete="current-password"
+                maxLength={PIN_LENGTH}
                 value={loginPass}
-                onChange={(e) => setLoginPass(e.target.value)}
-                placeholder="Your password"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
+                onChange={(e) => setLoginPass(pinDigits(e.target.value))}
+                placeholder="••••••"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg tracking-[0.35em] text-center font-mono focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !loginPass}
+              disabled={loading || !isSixDigitPin(loginPass)}
               className="w-full py-3.5 rounded-xl bg-brand-blue text-white font-semibold hover:bg-blue-800 disabled:opacity-60"
             >
               {loading ? 'Signing in…' : 'Sign in'}

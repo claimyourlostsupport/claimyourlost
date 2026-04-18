@@ -45,7 +45,15 @@ function SectionTabs() {
   );
 }
 
-const PASSWORD_MIN_LEN = 8;
+const PASSWORD_PIN_LEN = 6;
+
+function pinDigits(v) {
+  return String(v ?? '').replace(/\D/g, '').slice(0, PASSWORD_PIN_LEN);
+}
+
+function isSixDigitPin(s) {
+  return new RegExp(`^\\d{${PASSWORD_PIN_LEN}}$`).test(String(s ?? ''));
+}
 
 function HeaderBrowseMenu() {
   const { country, setCountryAndFocus } = useBrowseScope();
@@ -133,25 +141,26 @@ function HeaderBrowseMenu() {
 
   async function savePassword() {
     setPwdError('');
-    const next = pwdNew.trim();
-    const confirm = pwdConfirm.trim();
-    if (next.length < PASSWORD_MIN_LEN) {
-      setPwdError(`Use at least ${PASSWORD_MIN_LEN} characters.`);
+    const next = pinDigits(pwdNew);
+    const confirm = pinDigits(pwdConfirm);
+    const cur = pinDigits(pwdCurrent);
+    if (!isSixDigitPin(next)) {
+      setPwdError(`Password must be exactly ${PASSWORD_PIN_LEN} digits.`);
       return;
     }
     if (next !== confirm) {
-      setPwdError('New passwords do not match.');
+      setPwdError('Passwords do not match.');
       return;
     }
-    if (hasPassword && !pwdCurrent) {
-      setPwdError('Enter your current password.');
+    if (hasPassword && !isSixDigitPin(cur)) {
+      setPwdError(`Enter your current ${PASSWORD_PIN_LEN}-digit password.`);
       return;
     }
     setPwdSaving(true);
     try {
       await setPassword({
         password: next,
-        ...(hasPassword ? { currentPassword: pwdCurrent } : {}),
+        ...(hasPassword ? { currentPassword: cur } : {}),
       });
       setPasswordModalOpen(false);
     } catch (err) {
@@ -224,7 +233,7 @@ function HeaderBrowseMenu() {
                 setPasswordModalOpen(true);
               }}
             >
-              Change password
+              {hasPassword ? 'Change password' : 'Set password'}
             </button>
           )}
           <a
@@ -312,42 +321,50 @@ function HeaderBrowseMenu() {
             </h2>
             <p className="text-sm text-slate-600">
               {hasPassword
-                ? 'Enter your current password, then choose a new one (at least 8 characters).'
-                : 'Add a password (at least 8 characters). You can still sign in with your phone.'}
+                ? `Enter your current ${PASSWORD_PIN_LEN}-digit password, then choose a new ${PASSWORD_PIN_LEN}-digit password.`
+                : `Choose a ${PASSWORD_PIN_LEN}-digit numeric password. You can still sign in with your phone.`}
             </p>
             {hasPassword && (
               <label className="block">
-                <span className="text-xs font-medium text-slate-600">Current password</span>
+                <span className="text-xs font-medium text-slate-600">Current password (6 digits)</span>
                 <input
                   type="password"
+                  inputMode="numeric"
                   autoComplete="current-password"
+                  maxLength={PASSWORD_PIN_LEN}
                   value={pwdCurrent}
-                  onChange={(e) => setPwdCurrent(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                  onChange={(e) => setPwdCurrent(pinDigits(e.target.value))}
+                  placeholder="••••••"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-center font-mono tracking-widest bg-white"
                 />
               </label>
             )}
             <label className="block">
               <span className="text-xs font-medium text-slate-600">
-                {hasPassword ? 'New password' : 'Password'}
+                {hasPassword ? 'New password (6 digits)' : 'Password (6 digits)'}
               </span>
               <input
                 type="password"
+                inputMode="numeric"
                 autoComplete="new-password"
+                maxLength={PASSWORD_PIN_LEN}
                 value={pwdNew}
-                onChange={(e) => setPwdNew(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
-                placeholder={`At least ${PASSWORD_MIN_LEN} characters`}
+                onChange={(e) => setPwdNew(pinDigits(e.target.value))}
+                placeholder="••••••"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-center font-mono tracking-widest bg-white"
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-600">Confirm password</span>
+              <span className="text-xs font-medium text-slate-600">Confirm password (6 digits)</span>
               <input
                 type="password"
+                inputMode="numeric"
                 autoComplete="new-password"
+                maxLength={PASSWORD_PIN_LEN}
                 value={pwdConfirm}
-                onChange={(e) => setPwdConfirm(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                onChange={(e) => setPwdConfirm(pinDigits(e.target.value))}
+                placeholder="••••••"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-center font-mono tracking-widest bg-white"
               />
             </label>
             {pwdError && <p className="text-sm text-red-600">{pwdError}</p>}
