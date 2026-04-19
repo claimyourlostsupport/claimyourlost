@@ -9,3 +9,11 @@ html {
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+/* Leaflet divIcon defaults to a white bordered box — hide it for custom listing pins */
+.leaflet-div-icon.cyl-marker {
+  background: transparent !important;
+  border: none !important;
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+}

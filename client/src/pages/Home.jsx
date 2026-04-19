@@ -205,11 +205,15 @@ export function Home() {
         </Link>
       </div>
 
-      <p className="text-center">
+      <div className="text-center space-y-1 max-w-md mx-auto px-1">
         <Link to="/map" className="text-sm font-semibold text-brand-blue hover:underline">
           Browse listings on the map →
         </Link>
-      </p>
+        <p className="text-[10px] leading-snug text-slate-500">
+          On the map: <span className="font-medium text-slate-600">L</span> (red circle) = lost,{' '}
+          <span className="font-medium text-slate-600">F</span> (green square) = found; blue circle = you after Near me.
+        </p>
+      </div>
 
       <div className="space-y-1">
         <div className="space-y-0.5">

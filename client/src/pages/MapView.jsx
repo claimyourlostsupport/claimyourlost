@@ -14,20 +14,23 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl });
 
+/** Lost = red circle + “L”; Found = green rounded square + “F” (distinct shapes, no emoji-in-a-box). */
 const lostIcon = L.divIcon({
   className: 'cyl-marker cyl-marker-lost',
-  html: '<span style="font-size:22px">📍</span>',
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
-  popupAnchor: [0, -24],
+  html:
+    '<div style="width:30px;height:30px;border-radius:50%;background:#dc2626;color:#fff;font:700 13px/30px system-ui,-apple-system,sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35);border:2px solid #fff;letter-spacing:-0.02em" title="Lost listing">L</div>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -12],
 });
 
 const foundIcon = L.divIcon({
   className: 'cyl-marker cyl-marker-found',
-  html: '<span style="font-size:22px">✅</span>',
+  html:
+    '<div style="width:28px;height:28px;border-radius:7px;background:#059669;color:#fff;font:700 12px/28px system-ui,-apple-system,sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35);border:2px solid #fff;letter-spacing:-0.02em" title="Found listing">F</div>',
   iconSize: [28, 28],
-  iconAnchor: [14, 28],
-  popupAnchor: [0, -24],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -12],
 });
 
 function MapCenterOnUser({ center }) {
@@ -121,7 +124,8 @@ export function MapView() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Map</h1>
           <p className="text-sm text-slate-600 mt-1">
-            Pins use GPS from listings. Enable location to center the map on you.
+            Listing pins use each post’s GPS. Tap <strong className="text-slate-800">Near me</strong> to center on you and
+            show a blue “you are here” circle.
             {userPos && nearbyCount != null && (
               <span className="block mt-1 font-medium text-brand-blue">
                 {nearbyCount} listing{nearbyCount === 1 ? '' : 's'} within 25 km (with GPS).
@@ -148,6 +152,46 @@ export function MapView() {
           <div className="h-10 w-10 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
+        <>
+        <div
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 space-y-2"
+          aria-label="Map legend"
+        >
+          <p className="font-semibold text-slate-800 text-[11px] uppercase tracking-wide">Map key</p>
+          <ul className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-x-4 sm:gap-y-1.5">
+            <li className="flex items-center gap-2">
+              <span
+                className="shrink-0 w-[30px] h-[30px] rounded-full bg-red-600 text-white text-[13px] font-bold flex items-center justify-center border-2 border-white shadow-sm"
+                aria-hidden
+              >
+                L
+              </span>
+              <span>
+                <span className="font-medium text-slate-900">Lost</span> — someone is missing this item
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span
+                className="shrink-0 w-7 h-7 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center justify-center border-2 border-white shadow-sm"
+                aria-hidden
+              >
+                F
+              </span>
+              <span>
+                <span className="font-medium text-slate-900">Found</span> — someone found this and posted it
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span
+                className="shrink-0 w-7 h-7 rounded-full border-2 border-blue-800 bg-blue-500/35 flex items-center justify-center shadow-sm"
+                aria-hidden
+              />
+              <span>
+                <span className="font-medium text-slate-900">You</span> — only after you tap Near me (approximate area)
+              </span>
+            </li>
+          </ul>
+        </div>
         <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-[min(70vh,520px)] z-0">
           <MapContainer
             key={`${items.length}-${userPos?.lat ?? ''}-${userPos?.lng ?? ''}`}
@@ -213,6 +257,7 @@ export function MapView() {
             )}
           </MapContainer>
         </div>
+        </>
       )}
 
       <p className="text-xs text-slate-500">

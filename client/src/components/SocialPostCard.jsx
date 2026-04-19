@@ -5,6 +5,7 @@ import { formatDateTimeLocal } from '../utils/dateDisplay.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useFavorites } from '../context/FavoritesContext.jsx';
 import { publicUserLabel } from '../utils/publicUserLabel.js';
+import { socialShareLandingUrl } from '../utils/socialShareLandingUrl.js';
 
 const URL_RE = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
 
@@ -73,8 +74,12 @@ export function SocialPostCard({ post }) {
   const needsDescMore = description.length > 100;
 
   const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-  const sharePostUrl = `${siteBase.replace(/\/$/, '')}/social-hub/${post._id}`;
-  const shareText = `${description ? description.slice(0, 140) + (description.length > 140 ? '…' : '') : 'SocialHub post'}\n${sharePostUrl}`;
+  const sharePostUrl =
+    socialShareLandingUrl(post._id) || `${siteBase.replace(/\/$/, '')}/social-hub/${post._id}`;
+  const summaryLine = description
+    ? description.replace(/\s+/g, ' ').trim().slice(0, 200) + (description.length > 200 ? '…' : '')
+    : 'Social Hub post on ClaimYourLost — open the link for the photo or video.';
+  const shareText = `${summaryLine}\n\n${sharePostUrl}`;
 
   const isVideo = post.mediaType === 'video';
 
