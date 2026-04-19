@@ -154,10 +154,19 @@ export function renderSocialSharePage({ post, req }) {
   const safeImage = ogImage ? escapeHtmlAttr(ogImage) : '';
   const safeVideo = videoSecure ? escapeHtmlAttr(videoSecure) : '';
 
+  const ogImageType = safeImage
+    ? /\.png(\?|$)/i.test(ogImage)
+      ? 'image/png'
+      : /\.webp(\?|$)/i.test(ogImage)
+        ? 'image/webp'
+        : 'image/jpeg'
+    : '';
+
   const imageTags = safeImage
     ? `
     <meta property="og:image" content="${safeImage}" />
     <meta property="og:image:secure_url" content="${safeImage}" />
+    <meta property="og:image:type" content="${escapeHtmlAttr(ogImageType)}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${safeTitle}" />

@@ -83,39 +83,16 @@ Use a Node host; [Render](https://render.com) is straightforward on the free tie
 
 7. Go back to **Render** → your Web Service → **Environment** → set `CLIENT_URL` to that exact Pages URL (e.g. `https://claimyourlost-xxxxx.pages.dev`) → **Save** (Render will redeploy).
 
-**SPA routing:** The repo includes `client/public/_redirects` so client routes work on Pages. Rebuild after pulling latest.
+**SPA routing + share links:** Production builds write **`dist/_redirects`** via `vite.config.js`. The first rule sends **`/share/social/*`** to your **API** with a **302** (using **`VITE_API_URL`** at build time) so crawlers always receive real Open Graph HTML; the last rule keeps the SPA fallback. See [Cloudflare Pages redirects](https://developers.cloudflare.com/pages/configuration/redirects/).
 
-### Social Hub link previews (Facebook + your domain)
+### Social Hub link previews (Facebook / WhatsApp / LinkedIn)
 
-Facebook reads Open Graph tags from the **exact URL** people share. The catch-all `_redirects` rule would send `/share/social/*` to `index.html`, so `https://claimyourlost.com/share/social/...` would **not** include post images unless you proxy that path.
+1. **Cloudflare Pages** → **Environment variables** (Production): set **`VITE_API_URL`** to your full API origin, e.g. `https://claimyourlost-2.onrender.com` (no trailing slash). Every **production build** must see this so `_redirects` includes the share line.
+2. Set **`VITE_PUBLIC_SITE_URL`** to `https://claimyourlost.com` so in-app “Share” uses your domain in the pasted link (optional if users only share from the live site; the client also uses `window.location.origin` when it is HTTPS).
+3. On **Render** (API), set **`CLIENT_URL`** to `https://claimyourlost.com` so **`og:url` / canonical** in share HTML point at your domain. Use **`API_PUBLIC_ORIGIN`** (same as your Render URL) if `og:image` must load from `/uploads` on the API.
+4. After deploy, open `https://claimyourlost.com/share/social/<postId>` — you should get a short **302** to Render, then HTML with meta tags; the app then redirects to `/social-hub/<postId>`. In [Meta Sharing Debugger](https://developers.facebook.com/tools/debug/), use **Scrape Again** on the **claimyourlost.com** URL.
 
-1. The repo includes **`client/functions/_middleware.js`** (proxies `/share/social/:id` to your API) and **`client/public/_routes.json`** with **`include: ["/*"]`** and static **`exclude`** (so the Worker actually runs — a narrow include with no route file often returns Cloudflare’s “Page not found” 404). See [middleware](https://developers.cloudflare.com/pages/functions/middleware/) and [routing](https://developers.cloudflare.com/pages/platform/functions/routing/).
-2. In **Cloudflare Pages → Settings → Environment variables** (Production), add:
-
-   | Variable | Example |
-   |----------|---------|
-   | `SOCIAL_SHARE_API_ORIGIN` | `https://claimyourlost-2.onrender.com` (your API origin, no trailing slash) |
-
-   Redeploy Pages after saving.
-
-3. Set **`VITE_PUBLIC_SITE_URL`** to your public site, e.g. `https://claimyourlost.com`, and rebuild the client so “Share” uses `https://claimyourlost.com/share/social/:id` instead of the Render hostname.
-
-4. On **Render** (API), set **`CLIENT_URL`** to your public site (e.g. `https://claimyourlost.com`). That value is used for **`og:url` / canonical** on share pages so previews show your domain, not the Render URL. Optional extras:
-
-   | Variable | Example |
-   |----------|---------|
-   | `SHARE_PUBLIC_ORIGIN` | Only if `CLIENT_URL` cannot be the canonical site; overrides og URL |
-   | `API_PUBLIC_ORIGIN` | `https://claimyourlost-2.onrender.com` (same as API URL; used for `og:image` when uploads live on the API) |
-
-5. In [Meta Sharing Debugger](https://developers.facebook.com/tools/debug/), paste your **claimyourlost.com** share URL and use **Scrape Again** to refresh the cache.
-
-#### “Variables cannot be added to a Worker that only has static assets”
-
-Cloudflare shows this when you are **not** on a **Pages** project that bundles **Functions**, or the deployment is still “static files only.”
-
-1. In **Workers & Pages**, use the entry that is connected to **Git** (your repo), with **Build configuration** (root `client`, output `dist`). That is your **Pages** site. Do **not** use a separate **Worker** that only hosts assets — that Worker cannot have runtime variables.
-2. Open **that Pages project** → **Settings** → **Variables and Secrets** (under **Production**). If the UI still blocks variables, trigger a **new production deploy** from the latest `main` so `client/functions/` is included; the first deploy **with** Functions creates a real Worker runtime.
-3. **Workaround:** Edit `client/functions/_middleware.js` and set `HARDCODED_API_ORIGIN` to your Render API URL (e.g. `https://claimyourlost-2.onrender.com`), commit, redeploy Pages. `VITE_PUBLIC_SITE_URL` for share links is still set at **build time** in the same Pages **Variables** screen (or your build will keep using the API hostname for shares until that is set).
+**Note:** Pages **Functions** are **not** required for `/share/social/*` anymore (avoids intermittent Cloudflare **404** on that path).
 
 ---
 
