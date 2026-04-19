@@ -249,6 +249,12 @@ export function Home() {
               </p>
             )}
           </div>
+          {!nearbyMode && (
+            <p className="text-[9px] leading-snug text-slate-500 text-center sm:text-left max-w-lg mx-auto sm:mx-0 px-0.5">
+              Tap <span className="font-semibold text-slate-600">Near me</span> first, then slide the bar to choose how far
+              listings are shown.
+            </p>
+          )}
           {nearError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{nearError}</p>
           )}

@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useBrowseScope } from '../context/BrowseScopeContext.jsx';
 import {
   buildFullPhone,
   DEFAULT_DIAL_CODE,
+  dialOptionValue,
   getDialOptionsForSelect,
+  migrateLegacyDialStorage,
+  parseDialSelectionKey,
 } from '../constants/phoneDialCodes.js';
 
 const LOGIN_DIAL_STORAGE_KEY = 'cyl_login_dial';
@@ -40,19 +44,25 @@ function loginSubtitle(step, credentialMode) {
 
 export function Login() {
   const { login, loginWithPassword, requestOtp, updateProfile, setPassword, dismissNewUserPrompt } = useAuth();
+  const { setCountryAndFocus } = useBrowseScope();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
 
-  const [dialCode, setDialCode] = useState(() => {
+  const [dialSelection, setDialSelection] = useState(() => {
     try {
-      const saved = sessionStorage.getItem(LOGIN_DIAL_STORAGE_KEY);
-      if (saved && /^\d{1,5}$/.test(saved)) return saved;
+      const saved = typeof window !== 'undefined' ? sessionStorage.getItem(LOGIN_DIAL_STORAGE_KEY) : null;
+      return migrateLegacyDialStorage(saved);
     } catch {
-      /* ignore */
+      return migrateLegacyDialStorage(null);
     }
-    return DEFAULT_DIAL_CODE;
   });
+  const dialParsed = useMemo(() => {
+    const p = parseDialSelectionKey(dialSelection);
+    if (p?.dial) return p;
+    return { dial: DEFAULT_DIAL_CODE, countryName: 'India' };
+  }, [dialSelection]);
+  const dialCode = dialParsed.dial;
   const [nationalNumber, setNationalNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [loginPass, setLoginPass] = useState('');
@@ -67,11 +77,18 @@ export function Login() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(LOGIN_DIAL_STORAGE_KEY, dialCode);
+      sessionStorage.setItem(LOGIN_DIAL_STORAGE_KEY, dialSelection);
     } catch {
       /* ignore */
     }
-  }, [dialCode]);
+  }, [dialSelection]);
+
+  function handleLoginDialChange(e) {
+    const key = e.target.value;
+    setDialSelection(key);
+    const p = parseDialSelectionKey(key);
+    if (p?.countryName) setCountryAndFocus(p.countryName);
+  }
 
   const fullPhone = buildFullPhone(dialCode, nationalNumber);
 
@@ -223,7 +240,7 @@ export function Login() {
                 ? 'Set a password'
                 : step === 'credential' && credentialMode === 'password'
                   ? 'Enter your password'
-                  : 'Welcome back'}
+                  : 'Welcome'}
           </h1>
           <p className="text-sm text-slate-600">{loginSubtitle(step, credentialMode)}</p>
         </div>
@@ -331,13 +348,13 @@ export function Login() {
                 </label>
                 <select
                   id="login-country-code"
-                  value={dialCode}
-                  onChange={(e) => setDialCode(e.target.value)}
+                  value={dialSelection}
+                  onChange={handleLoginDialChange}
                   className="w-full sm:w-[min(100%,15.5rem)] shrink-0 rounded-xl border border-slate-200 px-3 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
                   aria-label="Country and dial code"
                 >
                   {getDialOptionsForSelect().map((c) => (
-                    <option key={`${c.dial}-${c.name}`} value={c.dial}>
+                    <option key={dialOptionValue(c)} value={dialOptionValue(c)}>
                       {c.name} (+{c.dial})
                     </option>
                   ))}
@@ -350,7 +367,7 @@ export function Login() {
                   required
                   value={nationalNumber}
                   onChange={(e) => setNationalNumber(e.target.value.replace(/\D/g, '').slice(0, 14))}
-                  placeholder="9958518979"
+                  placeholder="9431577258"
                   className="flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
                   aria-label="Mobile number without country code"
                 />

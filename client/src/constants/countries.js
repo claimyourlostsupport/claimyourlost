@@ -1,50 +1,12 @@
+import { PHONE_DIAL_CODES } from './phoneDialCodes.js';
+
 /**
  * Baseline country names for dropdowns (merged with /items/countries).
- * Deduped case-insensitively so "India" and "india" never appear twice.
+ * Kept in sync with login dial list names. Deduped case-insensitively in mergeCountryOptions.
  */
-export const COMMON_COUNTRIES = [
-  'Afghanistan',
-  'Australia',
-  'Bangladesh',
-  'Belgium',
-  'Brazil',
-  'Canada',
-  'China',
-  'France',
-  'Germany',
-  'India',
-  'Indonesia',
-  'Ireland',
-  'Italy',
-  'Japan',
-  'Kenya',
-  'Malaysia',
-  'Mexico',
-  'Nepal',
-  'Netherlands',
-  'New Zealand',
-  'Nigeria',
-  'Norway',
-  'Pakistan',
-  'Philippines',
-  'Poland',
-  'Portugal',
-  'Qatar',
-  'Russia',
-  'Saudi Arabia',
-  'Singapore',
-  'South Africa',
-  'South Korea',
-  'Spain',
-  'Sri Lanka',
-  'Sweden',
-  'Switzerland',
-  'Thailand',
-  'United Arab Emirates',
-  'United Kingdom',
-  'United States',
-  'Vietnam',
-];
+export const COMMON_COUNTRIES = [...new Set(PHONE_DIAL_CODES.map((c) => c.name))].sort((a, b) =>
+  a.localeCompare(b, 'en', { sensitivity: 'base' })
+);
 
 export function mergeCountryOptions(apiCountries) {
   const byKey = new Map();
