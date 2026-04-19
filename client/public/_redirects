@@ -1,0 +1,2 @@
+# SPA fallback (must stay last). /share/social/* is handled by Pages Functions, not this file.
+/*    /index.html   200
