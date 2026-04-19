@@ -83,14 +83,14 @@ Use a Node host; [Render](https://render.com) is straightforward on the free tie
 
 7. Go back to **Render** → your Web Service → **Environment** → set `CLIENT_URL` to that exact Pages URL (e.g. `https://claimyourlost-xxxxx.pages.dev`) → **Save** (Render will redeploy).
 
-**SPA routing + share:** `client/public/_redirects` is copied to `dist` (SPA fallback only). **`/share/social/*`** is handled by a **Pages Function** (`client/functions/share/social/[[path]].js`) that **fetches** Open Graph HTML from your API — no external `_redirects` rule (those can fail if `VITE_API_URL` is missing at build time). See [Pages Functions routing](https://developers.cloudflare.com/pages/platform/functions/routing/) and [redirects vs Functions](https://developers.cloudflare.com/pages/configuration/redirects/).
+**SPA + Social share:** `client/public/_redirects` is copied to `dist`. The **first** rule **`302`**s `/share/social/*` to your **Render** API so crawlers always get real Open Graph HTML. **Do not** add Pages Functions for the same path — [Cloudflare skips `_redirects` when a Function handles the URL](https://developers.cloudflare.com/pages/configuration/redirects/). Edit the API hostname in `_redirects` if your Render URL changes.
 
 ### Social Hub link previews (Facebook / WhatsApp / LinkedIn)
 
-1. **Cloudflare Pages** → **Settings** → **Variables** (Production): optional but recommended — **`SOCIAL_SHARE_API_ORIGIN`** or **`SHARE_PROXY_API_URL`** = your API, e.g. `https://claimyourlost-2.onrender.com`. The Function also has a **last-resort hardcoded** API URL in `[[path]].js` you can edit if env vars are unavailable.
-2. Set **`VITE_PUBLIC_SITE_URL`** to `https://claimyourlost.com` for share links; the client also uses `window.location.origin` when it is HTTPS.
-3. On **Render**, set **`CLIENT_URL`** = `https://claimyourlost.com` and **`API_PUBLIC_ORIGIN`** = your Render URL so **`og:url`** and **`og:image`** are correct.
-4. After deploy, open `https://claimyourlost.com/share/social/<postId>` — you should see HTML (not Cloudflare “Page not found”). Use [Sharing Debugger](https://developers.facebook.com/tools/debug/) → **Scrape Again**.
+1. Confirm **`client/public/_redirects`** in git matches your API (e.g. `https://claimyourlost-2.onrender.com`), then redeploy **Pages**.
+2. Set **`VITE_PUBLIC_SITE_URL`** to `https://claimyourlost.com` for in-app share links (optional if users share from the live site).
+3. On **Render**, set **`CLIENT_URL`** = `https://claimyourlost.com` and **`API_PUBLIC_ORIGIN`** = your API URL for correct **`og:url`** and **`og:image`** (HTTPS).
+4. Test `https://claimyourlost.com/share/social/<postId>` — you should get a **302** then HTML. [Sharing Debugger](https://developers.facebook.com/tools/debug/) → **Scrape Again**.
 
 ---
 

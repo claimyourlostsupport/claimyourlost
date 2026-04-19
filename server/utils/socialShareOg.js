@@ -76,6 +76,28 @@ function absoluteMediaUrl(req, mediaUrl) {
   return `${origin}${path}`;
 }
 
+/** Crawlers expect https; Render may report http internally. */
+function ogReadyMediaUrl(url) {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  return s.replace(/^http:\/\//i, 'https://');
+}
+
+/** Facebook-friendly size for Cloudinary *image* delivery. */
+function cloudinaryImageOgUrl(url) {
+  const s = String(url || '');
+  if (!s.includes('res.cloudinary.com') || !s.includes('/image/upload/')) return s;
+  try {
+    const u = new URL(s);
+    const [prefix, rest] = u.pathname.split('/image/upload/');
+    if (!rest || rest.startsWith('c_')) return s;
+    u.pathname = `${prefix}/image/upload/c_fill,w_1200,h_630,q_auto,f_auto/${rest}`;
+    return u.toString();
+  } catch {
+    return s;
+  }
+}
+
 /**
  * Cloudinary video → JPG frame URL for link previews (og:image).
  * @param {string} videoUrl
@@ -129,13 +151,15 @@ export function renderSocialSharePage({ post, req }) {
 
   let ogImage = '';
   if (mediaType === 'image' && mediaAbs) {
-    ogImage = mediaAbs;
+    ogImage = cloudinaryImageOgUrl(mediaAbs);
   } else if (mediaType === 'video') {
     ogImage = cloudinaryVideoThumbnailUrl(post.mediaUrl) || '';
   }
+  ogImage = ogReadyMediaUrl(ogImage);
 
-  const videoSecure =
+  let videoSecure =
     mediaType === 'video' && mediaAbs && /^https:\/\//i.test(mediaAbs) ? mediaAbs : '';
+  videoSecure = ogReadyMediaUrl(videoSecure);
   let videoType = '';
   if (videoSecure) {
     const low = videoSecure.toLowerCase();
@@ -154,10 +178,11 @@ export function renderSocialSharePage({ post, req }) {
   const safeImage = ogImage ? escapeHtmlAttr(ogImage) : '';
   const safeVideo = videoSecure ? escapeHtmlAttr(videoSecure) : '';
 
+  const ogForType = String(ogImage || '');
   const ogImageType = safeImage
-    ? /\.png(\?|$)/i.test(ogImage)
+    ? /\.png(\?|$)/i.test(ogForType)
       ? 'image/png'
-      : /\.webp(\?|$)/i.test(ogImage)
+      : /\.webp(\?|$)/i.test(ogForType)
         ? 'image/webp'
         : 'image/jpeg'
     : '';

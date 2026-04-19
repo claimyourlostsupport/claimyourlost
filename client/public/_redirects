@@ -1,2 +1,6 @@
-# SPA fallback (must stay last). /share/social/* is handled by Pages Functions, not this file.
+# Open Graph: send crawlers & users to API HTML first (302). Edit host if your Render URL changes.
+# Cloudflare skips _redirects for URLs handled by Pages Functions. Keep client/functions/ empty for /share.
+/share/social/* https://claimyourlost-2.onrender.com/share/social/:splat 302
+
+# SPA (must be last)
 /*    /index.html   200
