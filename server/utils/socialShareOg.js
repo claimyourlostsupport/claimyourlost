@@ -45,11 +45,16 @@ function apiPublicOrigin(req) {
 }
 
 /**
- * Public URL users share (e.g. https://claimyourlost.com). Must proxy /share/social/* to this API (Cloudflare Function).
+ * Public URL for og:url / canonical (e.g. https://claimyourlost.com/share/social/:id).
+ * Prefer SHARE_PUBLIC_ORIGIN; else CLIENT_URL (first entry) when https — avoids showing the Render hostname in previews.
  */
 function sharePagePublicOrigin(req) {
   const fromEnv = (process.env.SHARE_PUBLIC_ORIGIN || '').trim().replace(/\/$/, '');
   if (fromEnv) return fromEnv;
+  const client = primaryClientOrigin();
+  if (client && /^https:\/\//i.test(client)) {
+    return client;
+  }
   return requestPublicOrigin(req);
 }
 

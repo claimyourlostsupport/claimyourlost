@@ -100,11 +100,11 @@ Facebook reads Open Graph tags from the **exact URL** people share. The catch-al
 
 3. Set **`VITE_PUBLIC_SITE_URL`** to your public site, e.g. `https://claimyourlost.com`, and rebuild the client so “Share” uses `https://claimyourlost.com/share/social/:id` instead of the Render hostname.
 
-4. On **Render** (API), set:
+4. On **Render** (API), set **`CLIENT_URL`** to your public site (e.g. `https://claimyourlost.com`). That value is used for **`og:url` / canonical** on share pages so previews show your domain, not the Render URL. Optional extras:
 
    | Variable | Example |
    |----------|---------|
-   | `SHARE_PUBLIC_ORIGIN` | `https://claimyourlost.com` |
+   | `SHARE_PUBLIC_ORIGIN` | Only if `CLIENT_URL` cannot be the canonical site; overrides og URL |
    | `API_PUBLIC_ORIGIN` | `https://claimyourlost-2.onrender.com` (same as API URL; used for `og:image` when uploads live on the API) |
 
 5. In [Meta Sharing Debugger](https://developers.facebook.com/tools/debug/), paste your **claimyourlost.com** share URL and use **Scrape Again** to refresh the cache.
