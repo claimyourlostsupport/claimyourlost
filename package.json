@@ -11,9 +11,12 @@
     "dev:client": "npm run dev --prefix client",
     "build:client": "npm run build --prefix client",
     "clean-all": "npm run clean-all --prefix server",
-    "clear-social-posts": "npm run clear-social-posts --prefix server"
+    "clear-social-posts": "npm run clear-social-posts --prefix server",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "wrangler": "^4.83.0"
   }
 }
