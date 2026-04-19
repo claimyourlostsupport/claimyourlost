@@ -89,7 +89,7 @@ Use a Node host; [Render](https://render.com) is straightforward on the free tie
 
 Facebook reads Open Graph tags from the **exact URL** people share. The catch-all `_redirects` rule would send `/share/social/*` to `index.html`, so `https://claimyourlost.com/share/social/...` would **not** include post images unless you proxy that path.
 
-1. The repo includes **`client/functions/share/social/[id].js`**, which fetches HTML from your API (`GET /share/social/:id` on Render) and returns it on your **Pages domain**.
+1. The repo includes **`client/functions/_middleware.js`** (proxies `/share/social/:id` to your API) and **`client/public/_routes.json`** (so only those paths invoke Pages Functions). See [Functions routing](https://developers.cloudflare.com/pages/platform/functions/routing/).
 2. In **Cloudflare Pages → Settings → Environment variables** (Production), add:
 
    | Variable | Example |
@@ -108,6 +108,14 @@ Facebook reads Open Graph tags from the **exact URL** people share. The catch-al
    | `API_PUBLIC_ORIGIN` | `https://claimyourlost-2.onrender.com` (same as API URL; used for `og:image` when uploads live on the API) |
 
 5. In [Meta Sharing Debugger](https://developers.facebook.com/tools/debug/), paste your **claimyourlost.com** share URL and use **Scrape Again** to refresh the cache.
+
+#### “Variables cannot be added to a Worker that only has static assets”
+
+Cloudflare shows this when you are **not** on a **Pages** project that bundles **Functions**, or the deployment is still “static files only.”
+
+1. In **Workers & Pages**, use the entry that is connected to **Git** (your repo), with **Build configuration** (root `client`, output `dist`). That is your **Pages** site. Do **not** use a separate **Worker** that only hosts assets — that Worker cannot have runtime variables.
+2. Open **that Pages project** → **Settings** → **Variables and Secrets** (under **Production**). If the UI still blocks variables, trigger a **new production deploy** from the latest `main` so `client/functions/` is included; the first deploy **with** Functions creates a real Worker runtime.
+3. **Workaround:** Edit `client/functions/_middleware.js` and set `HARDCODED_API_ORIGIN` to your Render API URL (e.g. `https://claimyourlost-2.onrender.com`), commit, redeploy Pages. `VITE_PUBLIC_SITE_URL` for share links is still set at **build time** in the same Pages **Variables** screen (or your build will keep using the API hostname for shares until that is set).
 
 ---
 
