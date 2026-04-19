@@ -85,6 +85,30 @@ Use a Node host; [Render](https://render.com) is straightforward on the free tie
 
 **SPA routing:** The repo includes `client/public/_redirects` so client routes work on Pages. Rebuild after pulling latest.
 
+### Social Hub link previews (Facebook + your domain)
+
+Facebook reads Open Graph tags from the **exact URL** people share. The catch-all `_redirects` rule would send `/share/social/*` to `index.html`, so `https://claimyourlost.com/share/social/...` would **not** include post images unless you proxy that path.
+
+1. The repo includes **`client/functions/share/social/[id].js`**, which fetches HTML from your API (`GET /share/social/:id` on Render) and returns it on your **Pages domain**.
+2. In **Cloudflare Pages → Settings → Environment variables** (Production), add:
+
+   | Variable | Example |
+   |----------|---------|
+   | `SOCIAL_SHARE_API_ORIGIN` | `https://claimyourlost-2.onrender.com` (your API origin, no trailing slash) |
+
+   Redeploy Pages after saving.
+
+3. Set **`VITE_PUBLIC_SITE_URL`** to your public site, e.g. `https://claimyourlost.com`, and rebuild the client so “Share” uses `https://claimyourlost.com/share/social/:id` instead of the Render hostname.
+
+4. On **Render** (API), set:
+
+   | Variable | Example |
+   |----------|---------|
+   | `SHARE_PUBLIC_ORIGIN` | `https://claimyourlost.com` |
+   | `API_PUBLIC_ORIGIN` | `https://claimyourlost-2.onrender.com` (same as API URL; used for `og:image` when uploads live on the API) |
+
+5. In [Meta Sharing Debugger](https://developers.facebook.com/tools/debug/), paste your **claimyourlost.com** share URL and use **Scrape Again** to refresh the cache.
+
 ---
 
 ## Part 4 — Verify

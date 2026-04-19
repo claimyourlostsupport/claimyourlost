@@ -35,12 +35,37 @@ function requestPublicOrigin(req) {
   return `${proto}://${host}`;
 }
 
+/** Where uploads live (always API host). Avoids broken og:image when SHARE_PUBLIC_ORIGIN is the Pages domain. */
+function apiPublicOrigin(req) {
+  const fromEnv = (process.env.API_PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  return requestPublicOrigin(req);
+}
+
+/**
+ * Public URL users share (e.g. https://claimyourlost.com). Must proxy /share/social/* to this API (Cloudflare Function).
+ */
+function sharePagePublicOrigin(req) {
+  const fromEnv = (process.env.SHARE_PUBLIC_ORIGIN || '').trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  return requestPublicOrigin(req);
+}
+
+function isLinkPreviewCrawler(userAgent) {
+  const s = String(userAgent || '').toLowerCase();
+  return /facebookexternalhit|facebot|linkedinbot|whatsapp|slackbot|twitterbot|telegrambot|discordbot|pinterest|vkshare|redditbot|googlebot|bingpreview|applebot|bytespider/.test(
+    s
+  );
+}
+
 /** Turn stored mediaUrl into an absolute URL for og:image / og:video. */
 function absoluteMediaUrl(req, mediaUrl) {
   const u = String(mediaUrl || '').trim();
   if (!u) return '';
   if (/^https?:\/\//i.test(u)) return u;
-  const origin = requestPublicOrigin(req);
+  const origin = apiPublicOrigin(req);
   if (!origin) return '';
   const path = u.startsWith('/') ? u : `/${u}`;
   return `${origin}${path}`;
@@ -73,8 +98,11 @@ function cloudinaryVideoThumbnailUrl(videoUrl) {
 export function renderSocialSharePage({ post, req }) {
   const clientOrigin = primaryClientOrigin();
   const spaUrl = `${clientOrigin}/social-hub/${post._id}`;
-  const selfOrigin = requestPublicOrigin(req);
-  const sharePageUrl = selfOrigin ? `${selfOrigin}/share/social/${post._id}` : spaUrl;
+  const shareHost = sharePagePublicOrigin(req);
+  const sharePageUrl = shareHost ? `${shareHost}/share/social/${post._id}` : `${clientOrigin}/social-hub/${post._id}`;
+
+  const ua = req.get('user-agent');
+  const crawler = isLinkPreviewCrawler(ua);
 
   const descriptionRaw = String(post.description || '').trim();
   const city = String(post.city || '').trim();
@@ -125,6 +153,9 @@ export function renderSocialSharePage({ post, req }) {
     ? `
     <meta property="og:image" content="${safeImage}" />
     <meta property="og:image:secure_url" content="${safeImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${safeTitle}" />
     <meta name="twitter:image" content="${safeImage}" />`
     : '';
 
@@ -157,9 +188,8 @@ ${videoTags}
   <meta name="twitter:card" content="${safeImage ? 'summary_large_image' : 'summary'}" />
   <meta name="twitter:title" content="${safeTitle}" />
   <meta name="twitter:description" content="${safeDesc}" />
-
-  <meta http-equiv="refresh" content="0;url=${escapeHtmlAttr(spaUrl)}" />
-  <script>location.replace(${spaUrlJs});</script>
+${crawler ? '' : `  <meta http-equiv="refresh" content="0;url=${escapeHtmlAttr(spaUrl)}" />
+  <script>location.replace(${spaUrlJs});</script>`}
 </head>
 <body style="font-family:system-ui,sans-serif;padding:1.25rem;max-width:32rem;margin:0 auto;color:#334155">
   <p style="font-size:0.9rem">Opening this Social Hub post in ClaimYourLost…</p>
