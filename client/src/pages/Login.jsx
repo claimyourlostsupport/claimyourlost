@@ -367,7 +367,7 @@ export function Login() {
                   required
                   value={nationalNumber}
                   onChange={(e) => setNationalNumber(e.target.value.replace(/\D/g, '').slice(0, 14))}
-                  placeholder="9431577258"
+                  placeholder="999888123"
                   className="flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-base focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue"
                   aria-label="Mobile number without country code"
                 />
